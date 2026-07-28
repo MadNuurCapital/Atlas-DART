@@ -66,12 +66,18 @@ describe("the service-role key cannot reach the browser", () => {
       return;
     }
 
+    // Match an actual key - the prefix followed by key material - rather than
+    // the bare literal. supabase-js legitimately ships the string "sb_secret_"
+    // in its own key-format check (`e.startsWith("sb_secret_")`), so searching
+    // for the prefix alone flags the library and cries wolf on every build.
+    const SECRET_VALUE = /sb_secret_[A-Za-z0-9_-]{8,}/;
+
     const leaked = walk(staticDir)
       .filter((f) => f.endsWith(".js"))
       .filter((f) => {
         const content = readFileSync(f, "utf8");
         return (
-          content.includes("SUPABASE_SECRET_KEY") || content.includes("sb_secret_")
+          content.includes("SUPABASE_SECRET_KEY") || SECRET_VALUE.test(content)
         );
       })
       .map((f) => relative(ROOT, f));
@@ -95,5 +101,25 @@ describe("server-only boundaries are declared", () => {
         `${relative(ROOT, file)} must import "server-only"`,
       ).toBe(true);
     }
+  });
+});
+
+describe("the bundle scanner actually detects a leak", () => {
+  // A guard that cannot fail is not a guard. This proves the pattern used
+  // above matches a real key while ignoring the library's prefix check.
+  const SECRET_VALUE = /sb_secret_[A-Za-z0-9_-]{8,}/;
+
+  it("matches a real secret key", () => {
+    expect(
+      SECRET_VALUE.test('const k = "sb_secret_9fJ2kQx7ZmLp0Ab3";'),
+    ).toBe(true);
+  });
+
+  it("ignores supabase-js's own prefix comparison", () => {
+    expect(
+      SECRET_VALUE.test(
+        'e=>e.startsWith("sb_publishable_")||e.startsWith("sb_secret_")',
+      ),
+    ).toBe(false);
   });
 });

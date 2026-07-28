@@ -451,3 +451,40 @@ describe("case restoration is an admin action", () => {
     });
   });
 });
+
+describe("realtime publication", () => {
+  // The admin board relies on these three tables emitting change events. If a
+  // future migration drops one from the publication, the board silently stops
+  // updating and nobody notices until a meeting.
+  it("publishes the tables the admin board subscribes to", async () => {
+    await withRollback(async (c) => {
+      await asOwner(c);
+      const { rows } = await c.query<{ tablename: string }>(
+        `select tablename from pg_publication_tables
+          where pubname = 'supabase_realtime' and schemaname = 'public'
+          order by tablename`,
+      );
+      const published = rows.map((r) => r.tablename);
+      expect(published).toContain("daily_submissions");
+      expect(published).toContain("appointment_activities");
+      expect(published).toContain("cases");
+    });
+  });
+
+  it("sends the full old row so subscribers can tell what changed", async () => {
+    await withRollback(async (c) => {
+      await asOwner(c);
+      const { rows } = await c.query<{ relname: string; identity: string }>(
+        `select relname, relreplident as identity
+           from pg_class
+          where relnamespace = 'public'::regnamespace
+            and relname in ('daily_submissions', 'appointment_activities', 'cases')
+          order by relname`,
+      );
+      for (const row of rows) {
+        // 'f' is REPLICA IDENTITY FULL; the default 'd' sends only the key.
+        expect(row.identity, `${row.relname} replica identity`).toBe("f");
+      }
+    });
+  });
+});

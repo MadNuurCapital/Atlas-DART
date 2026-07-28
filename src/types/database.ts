@@ -198,6 +198,44 @@ export type MissingSubmission = {
   business_date: string;
 };
 
+/**
+ * One row per active person for a given date, whether or not they submitted.
+ * A missing person is a row with nulls and status "missing", never an absence.
+ */
+export type TeamDailyRow = {
+  user_id: string;
+  full_name: string;
+  role: Role;
+  business_date: string;
+  submission_id: string | null;
+  status: SubmissionStatus | "missing";
+  dials: number | null;
+  talked_to: number | null;
+  campaign_status: CampaignStatus | null;
+  in_office: boolean | null;
+  appointments_opening: number | null;
+  appointments_closing: number | null;
+  appointments_follow_up: number | null;
+  appointments_nomination: number | null;
+  signed_cases: number | null;
+  active_gr: number | null;
+  first_submitted_at: string | null;
+  last_submitted_at: string | null;
+  revision_count: number | null;
+  on_time: boolean | null;
+};
+
+export type MonthlyComplianceRow = {
+  consultant_id: string;
+  full_name: string;
+  required_days: number;
+  submitted_days: number;
+  on_time_days: number;
+  late_days: number;
+  missing_days: number;
+  compliance: number;
+};
+
 type InsertOf<T, Generated extends keyof T> = Omit<T, Generated> &
   Partial<Pick<T, Generated>>;
 
@@ -290,11 +328,14 @@ export type Database = {
     Functions: {
       sg_today: { Args: Record<string, never>; Returns: string };
       is_admin: { Args: Record<string, never>; Returns: boolean };
-      missing_submissions: { Args: { p_date?: string }; Returns: MissingSubmission[] };
-      team_daily: { Args: { p_date?: string }; Returns: unknown[] };
+      missing_submissions: {
+        Args: { p_date?: string };
+        Returns: MissingSubmission[];
+      };
+      team_daily: { Args: { p_date?: string }; Returns: TeamDailyRow[] };
       monthly_compliance: {
         Args: { p_year: number; p_month: number };
-        Returns: unknown[];
+        Returns: MonthlyComplianceRow[];
       };
     };
     Enums: Record<string, never>;

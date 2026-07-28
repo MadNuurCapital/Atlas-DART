@@ -70,21 +70,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin area: check the role in the database, not in a client-supplied claim.
-  if (user && pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
-  }
+  // The admin role is deliberately NOT checked here.
+  //
+  // It used to be, which meant every /admin request paid for an extra profiles
+  // SELECT before the page even started rendering - and then the admin layout
+  // looked the role up again anyway. The check now happens once, in
+  // requireAdmin(), where the answer is already cached for the rest of the
+  // render.
+  //
+  // Nothing is weaker for it. A consultant who reaches /admin is redirected by
+  // the layout instead of by middleware, and Row Level Security means the page
+  // could not have shown them anything either way.
 
   return response;
 }

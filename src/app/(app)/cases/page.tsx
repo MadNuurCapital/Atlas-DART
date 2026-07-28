@@ -1,14 +1,30 @@
 import type { Metadata } from "next";
-import { PhasePlaceholder } from "@/components/app-shell/phase-placeholder";
+import { requireProfile } from "@/lib/auth";
+import { fetchCases } from "@/lib/cases-query";
+import { CaseList } from "@/components/cases/case-list";
 
 export const metadata: Metadata = { title: "Cases" };
+export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function CasesPage() {
+  const profile = await requireProfile();
+  const { cases, insurers } = await fetchCases();
+
   return (
-    <PhasePlaceholder
-      title="Case Tracker"
-      phase="Phase 3"
-      description="Signed cases, APE and GR, with search by client and filtering by month. Cancelling removes a case from totals without losing the record."
-    />
+    <div className="mx-auto w-full max-w-3xl space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold">Case Tracker</h1>
+        <p className="text-sm text-muted-foreground">
+          A case counts from the day it was submitted to the insurer.
+          Cancelling removes it from your totals without losing the record.
+        </p>
+      </div>
+
+      <CaseList
+        cases={cases}
+        insurers={insurers}
+        isAdmin={profile.role === "admin"}
+      />
+    </div>
   );
 }

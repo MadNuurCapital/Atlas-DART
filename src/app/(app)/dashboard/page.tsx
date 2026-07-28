@@ -16,7 +16,14 @@ import {
 } from "@/lib/sg-date";
 import { DEADLINE_LABEL, CAMPAIGN_STATUS_LABELS } from "@/lib/constants";
 import { compliancePercent } from "@/lib/targets";
-import type { DailyConsultantSummary } from "@/types/database";
+import { TargetPanel } from "@/components/dashboard/target-panel";
+import { CaseMixPanel } from "@/components/dashboard/case-mix-panel";
+import type {
+  CaseMixByCategory,
+  DailyConsultantSummary,
+  PendingInception,
+  TargetShortfall,
+} from "@/types/database";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -42,7 +49,13 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  const [{ data: todayRow }, { data: monthRows }] = await Promise.all([
+  const [
+    { data: todayRow },
+    { data: monthRows },
+    { data: targetRow },
+    { data: pendingRow },
+    { data: mixRows },
+  ] = await Promise.all([
     supabase
       .from("v_daily_consultant_summary")
       .select("*")
@@ -55,6 +68,22 @@ export default async function DashboardPage() {
       .eq("user_id", profile.id)
       .gte("business_date", monthStart)
       .lte("business_date", today),
+    supabase
+      .from("v_target_shortfall")
+      .select("*")
+      .eq("consultant_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("v_pending_inception")
+      .select("*")
+      .eq("consultant_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("v_case_mix_by_category")
+      .select("*")
+      .eq("consultant_id", profile.id)
+      .eq("year", year)
+      .eq("month", month),
   ]);
 
   const summary = (todayRow as DailyConsultantSummary | null) ?? null;
@@ -149,6 +178,13 @@ export default async function DashboardPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <TargetPanel
+        target={(targetRow as TargetShortfall | null) ?? null}
+        pending={(pendingRow as PendingInception | null) ?? null}
+      />
+
+      <CaseMixPanel rows={(mixRows as CaseMixByCategory[]) ?? []} />
 
       <Card>
         <CardHeader className="pb-3">

@@ -34,6 +34,9 @@ self.addEventListener("push", (event) => {
     tag: payload.tag || "dart-daily-reminder",
     renotify: true,
     requireInteraction: Boolean(payload.requireInteraction),
+    // Overnight the day is already late, so the notification waits on the
+    // lock screen rather than waking the whole team at 3am.
+    silent: Boolean(payload.silent),
     data: { url: payload.url || "/today" },
     actions: [{ action: "submit", title: "Submit now" }],
   };

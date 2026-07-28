@@ -9,48 +9,61 @@ import {
 } from "./lib/reminders.mts";
 
 /**
- * The nagging push notification.
+ * The hourly chase.
  *
- * Runs every hour from 09:00 to 15:00 UTC, which is 17:00 to 23:00 Singapore.
- * Anyone who has not submitted gets a notification every one of those hours;
- * the moment they submit, they drop off the list and it stops. That is the
- * whole mechanism - there is no snooze, because the only way to stop it is the
- * thing we want them to do.
+ * Runs every hour from 11:00 to 22:00 UTC, which is 19:00 through 06:00 in
+ * Singapore - a contiguous UTC range even though it crosses Singapore midnight.
  *
- * Each hour writes its own reminder_logs row (push_17, push_18, ...) so the
- * unique key still makes a Netlify retry idempotent within that hour, without
- * one hour's row blocking the next.
+ *   7pm - 11pm SGT   with sound. The deadline has not passed, so these are the
+ *                    ones that actually prevent a missed day.
+ *   midnight - 6am   SILENT, and about YESTERDAY. The day is already late
+ *                    whatever anyone does, so the notification waits on the
+ *                    lock screen rather than waking the whole team at 3am.
+ *
+ * Submitting removes someone from the list, and the chase stops. That is the
+ * only way to stop it, which is the point.
  */
 
-type Level = "gentle" | "firm" | "urgent" | "final";
+const NAG_END_HOUR = 7;
 
-function levelForHour(sgHour: number): Level {
-  if (sgHour < 19) return "firm";
-  if (sgHour < 22) return "urgent";
+type Level = "firm" | "urgent" | "final" | "overdue";
+
+function levelForHour(hour: number): Level {
+  if (hour < NAG_END_HOUR) return "overdue";
+  if (hour < 21) return "firm";
+  if (hour < 23) return "urgent";
   return "final";
 }
 
-function copyFor(level: Level, firstName: string, hour: number) {
-  const remaining = 24 - hour;
-
+function copyFor(level: Level, firstName: string) {
   switch (level) {
+    case "overdue":
+      return {
+        title: `Yesterday's DART is still missing, ${firstName}`,
+        body: "It is already late. Submit it before your admin gets the 6 AM list.",
+        requireInteraction: true,
+        silent: true,
+      };
     case "final":
       return {
-        title: `Last call, ${firstName}`,
-        body: "DART closes at 11:59 PM. Submit now or today counts as missed.",
+        title: `Last call, ${firstName} — DART closes at 11:59 PM`,
+        body: "Submit now or today counts as missed.",
         requireInteraction: true,
+        silent: false,
       };
     case "urgent":
       return {
-        title: `${firstName}, your DART is still missing`,
-        body: `${remaining} hour${remaining === 1 ? "" : "s"} left. It takes two minutes.`,
+        title: `Your DART is not updated, ${firstName}`,
+        body: "Closes at 11:59 PM tonight. Submit before you forget.",
         requireInteraction: true,
+        silent: false,
       };
     default:
       return {
-        title: `Today's DART is not in yet, ${firstName}`,
-        body: "Submit it before you get pulled into something else.",
+        title: `Your DART is not updated, ${firstName}`,
+        body: "Closes at 11:59 PM. It takes about two minutes.",
         requireInteraction: false,
+        silent: false,
       };
   }
 }
@@ -65,6 +78,13 @@ function sgHourNow(now: Date = new Date()): number {
   );
 }
 
+/** Yesterday, in the Singapore calendar. */
+function previousDay(date: string): string {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const shifted = new Date(Date.UTC(y, m - 1, d - 1, 12));
+  return shifted.toISOString().slice(0, 10);
+}
+
 export default async function handler(request: Request) {
   const url = new URL(request.url);
   const scheduled = url.searchParams.get("scheduled") !== null;
@@ -73,10 +93,15 @@ export default async function handler(request: Request) {
     return new Response("Unauthorised", { status: 401 });
   }
 
-  const businessDate = url.searchParams.get("date") ?? sgToday();
-  const dryRun = url.searchParams.get("dryRun") === "true";
   const hour = Number(url.searchParams.get("hour") ?? sgHourNow());
   const level = levelForHour(hour);
+
+  // Overnight the day being chased is yesterday. Today has barely started.
+  const businessDate =
+    url.searchParams.get("date") ??
+    (hour < NAG_END_HOUR ? previousDay(sgToday()) : sgToday());
+
+  const dryRun = url.searchParams.get("dryRun") === "true";
   const reminderType = `push_${hour}`;
 
   console.log(
@@ -103,7 +128,7 @@ export default async function handler(request: Request) {
 
     if (missing.length === 0) {
       console.log("[push-reminders] nobody missing - nothing to do");
-      return Response.json({ businessDate, hour, missing: 0, sent: 0 });
+      return Response.json({ businessDate, hour, level, missing: 0, sent: 0 });
     }
 
     // One query for every live subscription belonging to anyone missing,
@@ -117,11 +142,11 @@ export default async function handler(request: Request) {
       )
       .lt("failure_count", 5);
 
-    const byUser = new Map<string, typeof subs>();
+    const byUser = new Map<string, NonNullable<typeof subs>>();
     for (const sub of subs ?? []) {
       const list = byUser.get(sub.user_id) ?? [];
       list.push(sub);
-      byUser.set(sub.user_id, list as typeof subs);
+      byUser.set(sub.user_id, list);
     }
 
     let sent = 0;
@@ -136,7 +161,7 @@ export default async function handler(request: Request) {
         continue;
       }
 
-      // Already nagged this person in this hour? A Netlify retry must not
+      // Already chased this person in this hour? A Netlify retry must not
       // buzz the same phone twice.
       const { data: already } = await supabase
         .from("reminder_logs")
@@ -152,7 +177,7 @@ export default async function handler(request: Request) {
       }
 
       const firstName = person.full_name.split(" ")[0] ?? person.full_name;
-      const message = copyFor(level, firstName, hour);
+      const message = copyFor(level, firstName);
       let deliveredToAny = false;
       let lastError: string | undefined;
 
@@ -166,7 +191,9 @@ export default async function handler(request: Request) {
             JSON.stringify({
               ...message,
               tag: "dart-daily-reminder",
-              url: appUrl ? `${appUrl}/today` : "/today",
+              url: appUrl
+                ? `${appUrl}/today?date=${businessDate}`
+                : `/today?date=${businessDate}`,
             }),
             { TTL: 3600 },
           );
@@ -174,8 +201,7 @@ export default async function handler(request: Request) {
           sent += 1;
         } catch (error) {
           const status = (error as { statusCode?: number }).statusCode;
-          lastError =
-            error instanceof Error ? error.message : String(error);
+          lastError = error instanceof Error ? error.message : String(error);
 
           if (status === 404 || status === 410) {
             // The browser threw this subscription away. It will never work
@@ -214,6 +240,7 @@ export default async function handler(request: Request) {
       businessDate,
       hour,
       level,
+      silent: level === "overdue",
       dryRun,
       missing: missing.length,
       sent,
@@ -233,6 +260,7 @@ export default async function handler(request: Request) {
 }
 
 export const config: Config = {
-  // Hourly from 09:00 to 15:00 UTC = 17:00 to 23:00 Asia/Singapore.
-  schedule: "0 9-15 * * *",
+  // Hourly 11:00-22:00 UTC = 19:00-06:00 Asia/Singapore. Contiguous in UTC
+  // even though it crosses Singapore midnight.
+  schedule: "0 11-22 * * *",
 };

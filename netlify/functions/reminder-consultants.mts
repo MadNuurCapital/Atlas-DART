@@ -112,6 +112,9 @@ export default async function handler(request: Request) {
 }
 
 export const config: Config = {
-  // 13:00 UTC = 21:00 Asia/Singapore. Netlify cron expressions are always UTC.
+  // 13:00 UTC = 21:00 Asia/Singapore - inside the 7pm-11pm push window, so an
+  // email arrives alongside the notifications rather than at a different time.
+  // Only sends once a Resend domain is verified; until then it logs the
+  // failure and the push notifications do the work.
   schedule: "0 13 * * *",
 };

@@ -8,11 +8,12 @@ export const metadata: Metadata = { title: "Reminders" };
 export const dynamic = "force-dynamic";
 
 const SCHEDULE = [
-  ["5:00 PM", "First nudge"],
-  ["6:00 – 9:00 PM", "Hourly"],
-  ["10:00 PM", "Getting insistent"],
+  ["7:00 PM", "First reminder"],
+  ["8:00 – 10:00 PM", "Every hour"],
   ["11:00 PM", "Last call"],
-  ["11:59 PM", "Closed — counts as missed"],
+  ["11:59 PM", "Deadline — after this the day counts as late"],
+  ["Midnight – 6:00 AM", "Every hour, but silent — it waits on your lock screen"],
+  ["6:00 AM", "Your admin gets the list of who missed"],
 ] as const;
 
 export default async function NotificationsPage() {
@@ -59,7 +60,8 @@ export default async function NotificationsPage() {
             ))}
           </ul>
           <p className="mt-4 rounded-md border border-border bg-muted px-3 py-2.5 text-xs text-muted-foreground">
-            All of it stops the moment you submit. Submitting early is the only
+            All of it stops the moment you submit. Nothing fires before 7 PM,
+            and nothing makes a sound after midnight. Submitting is the only
             way to make it leave you alone — which is rather the point.
           </p>
         </CardContent>

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
 import { Toaster } from "@/components/ui/sonner";
 import { formatSgDate, sgToday } from "@/lib/sg-date";
+import { nagBusinessDate } from "@/lib/nag";
 
 export default async function AppLayout({
   children,
@@ -20,18 +21,22 @@ export default async function AppLayout({
   const isAdmin = profile.role === "admin";
   const today = sgToday();
 
-  // One cheap query, once, in the layout: has today been submitted? It drives
-  // both the nag banner and the badge on the Today tab, so the answer is
-  // fetched in one place rather than on every page that wants to know.
+  // Which day the nag is about. Between midnight and 6am it is still
+  // yesterday - today has barely started and nobody owes anything for it yet.
+  const nagDate = nagBusinessDate();
+
+  // One cheap query, once, in the layout. It drives both the nag banner and
+  // the badge on the Today tab, so the answer is fetched in one place rather
+  // than on every page that wants to know.
   const supabase = await createClient();
-  const { data: todaySubmission } = await supabase
+  const { data: nagSubmission } = await supabase
     .from("daily_submissions")
     .select("status")
     .eq("user_id", profile.id)
-    .eq("business_date", today)
+    .eq("business_date", nagDate)
     .maybeSingle();
 
-  const submittedToday = todaySubmission?.status === "submitted";
+  const submittedToday = nagSubmission?.status === "submitted";
   const firstName = profile.full_name.split(" ")[0];
 
   return (

@@ -1,17 +1,55 @@
 # Reminder functions
 
-Two Netlify Scheduled Functions. Exactly one email per person per day.
+Three Netlify Scheduled Functions.
 
-| Function | Cron (UTC) | Singapore | Sends to |
+| Function | Cron (UTC) | Singapore | What it does |
 |---|---|---|---|
-| `reminder-consultants` | `0 13 * * *` | 21:00 | Anyone with no submission today |
-| `reminder-admin-digest` | `59 15 * * *` | 23:59 | Every active admin |
+| `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | Chases anyone still missing |
+| `reminder-consultants` | `0 13 * * *` | 21:00 | One email (needs a Resend domain) |
+| `reminder-admin-digest` | `0 22 * * *` | 06:00 | Emails admins yesterday's missing list |
 
-## Why two, and why those times
+## The hourly chase
 
-The original brief scheduled a single reminder at 23:59 Singapore — which is also the submission deadline. That gives a consultant sixty seconds to act, so it is a post-mortem rather than a reminder.
+`push-reminders` runs every hour from 11:00 to 22:00 UTC — 19:00 through 06:00
+in Singapore. That is a contiguous UTC range even though it crosses Singapore
+midnight, so it is one cron rather than two.
 
-The nudge therefore fires at **21:00**, about three hours before the deadline, when it is still something a person can act on. The admin digest fires at **23:59**, because that list needs to be *final* — taken any earlier and it names people who went on to submit.
+| Singapore | Level | Sound | About |
+|---|---|---|---|
+| 7–8pm | firm | yes | today |
+| 9–10pm | urgent | yes | today |
+| 11pm | final | yes | today |
+| midnight–6am | overdue | **silent** | **yesterday** |
+
+Two things worth understanding:
+
+**Overnight it chases yesterday.** At 2am nobody owes anything for the day that
+just started. `nagBusinessDate()` and the function agree on this, so the
+notification, the banner and the Submit link all point at the same day.
+
+**Overnight it is silent.** The day is already late whatever anyone does, so the
+notification waits on the lock screen rather than waking the team at 3am. That
+is what makes an all-night chase acceptable rather than the thing that makes
+everyone disable notifications — which would cost the 7–11pm pings that actually
+prevent a missed day.
+
+Notifications share a tag, so a later one replaces the earlier rather than
+stacking twelve by morning.
+
+Each hour writes its own `reminder_logs` row (`push_19`, `push_20`, …) so a
+Netlify retry is idempotent within the hour without one hour blocking the next.
+
+A subscription that returns 404 or 410 is deleted rather than retried hourly
+forever — that status means the browser has thrown it away for good.
+
+
+## Why the admin digest is at 6am
+
+Not at the 23:59 deadline, which is where the original brief put it. A digest
+sent at the deadline names people who then submit at 1am — and an admin who has
+been told someone missed will remember that whatever the record says afterwards.
+
+At 6am the overnight chase has finished and the list can no longer change.
 
 Cron expressions in `netlify.toml` and in `export const config` are always UTC. Singapore is UTC+8 year-round with no daylight saving, so the conversion is fixed.
 

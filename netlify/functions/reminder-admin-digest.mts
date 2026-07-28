@@ -15,15 +15,25 @@ import {
 
 const REMINDER_TYPE = "admin_digest";
 
+/** Yesterday, in the Singapore calendar. */
+function previousDay(date: string): string {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d - 1, 12)).toISOString().slice(0, 10);
+}
+
 /**
- * One combined digest to each admin listing who is still missing.
+ * One combined digest to each admin listing who missed yesterday.
  *
- * Runs at 15:59 UTC, which is 23:59 in Singapore - the deadline itself. That
- * is deliberate: this list needs to be final, so it must be taken after
- * everyone has had their full day, unlike the 21:00 consultant nudge.
+ * Runs at 22:00 UTC, which is 06:00 in Singapore - after the overnight chase
+ * has finished and the list can no longer change. It reports on YESTERDAY,
+ * because at 6am that is the day whose deadline has passed.
+ *
+ * Waiting until morning is deliberate. A digest at the 23:59 deadline would
+ * name people who then submitted at 1am, and an admin who has been told
+ * someone missed will remember that whatever the record says afterwards.
  *
  * A digest is sent even when nobody is missing, because "everyone submitted"
- * is itself information an admin wants at the end of the day.
+ * is itself information worth having with the morning coffee.
  */
 export default async function handler(request: Request) {
   const url = new URL(request.url);
@@ -33,7 +43,8 @@ export default async function handler(request: Request) {
     return new Response("Unauthorised", { status: 401 });
   }
 
-  const businessDate = url.searchParams.get("date") ?? sgToday();
+  // At 6am the day being reported on is yesterday.
+  const businessDate = url.searchParams.get("date") ?? previousDay(sgToday());
   const dryRun = url.searchParams.get("dryRun") === "true";
 
   console.log(
@@ -122,6 +133,6 @@ export default async function handler(request: Request) {
 }
 
 export const config: Config = {
-  // 15:59 UTC = 23:59 Asia/Singapore, the submission deadline itself.
-  schedule: "59 15 * * *",
+  // 22:00 UTC = 06:00 Asia/Singapore, after the overnight chase has ended.
+  schedule: "0 22 * * *",
 };

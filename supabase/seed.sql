@@ -1,0 +1,36 @@
+-- ---------------------------------------------------------------------------
+-- Local development seed. NOT applied to production.
+--
+-- Creating the real accounts is a Supabase Auth operation, not a SQL one - see
+-- docs/database.md for the invite flow. This file only exists so a local or
+-- staging database has something to look at.
+--
+-- The profiles rows below depend on matching auth.users rows existing first.
+-- Create those in the Supabase dashboard (Authentication > Users > Add user),
+-- then run this with the real UUIDs substituted in.
+-- ---------------------------------------------------------------------------
+
+-- Example: promote a freshly invited user to admin.
+--
+--   update public.profiles
+--      set role = 'admin'
+--    where email = 'director@yourdomain.com';
+--
+-- Example: set this year's target for a consultant (D17 - the yearly row is
+-- authoritative, monthly is derived as yearly / 12 unless overridden).
+--
+--   insert into public.consultant_targets (consultant_id, period_type, year, gr_target)
+--   select id, 'yearly', extract(year from public.sg_today())::int, 120000
+--     from public.profiles
+--    where email = 'consultant@yourdomain.com'
+--   on conflict (consultant_id, period_type, year, coalesce(month, 0))
+--   do update set gr_target = excluded.gr_target;
+--
+-- Example: override December only.
+--
+--   insert into public.consultant_targets (consultant_id, period_type, year, month, gr_target)
+--   select id, 'monthly', extract(year from public.sg_today())::int, 12, 5000
+--     from public.profiles
+--    where email = 'consultant@yourdomain.com'
+--   on conflict (consultant_id, period_type, year, coalesce(month, 0))
+--   do update set gr_target = excluded.gr_target;

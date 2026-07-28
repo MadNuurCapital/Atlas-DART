@@ -1,0 +1,153 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Integrated Barakah Wealth Advisory - brand tokens.
+
+   These four values are sampled by eye from the supplied logo and are the ONLY
+   place brand colour is defined. When the exact hex codes arrive, change them
+   here and the whole application follows. Nothing else hard-codes a colour.
+--------------------------------------------------------------------------- */
+:root {
+  --brand-blue: #1e7fa6;
+  --brand-blue-deep: #17607e;
+  --brand-orange: #f5a02a;
+  --brand-grey: #4d4d4f;
+
+  --radius: 0.625rem;
+
+  --background: #ffffff;
+  --foreground: var(--brand-grey);
+
+  --card: #ffffff;
+  --card-foreground: var(--brand-grey);
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-grey);
+
+  --primary: var(--brand-blue);
+  --primary-foreground: #ffffff;
+
+  --secondary: #f1f5f7;
+  --secondary-foreground: var(--brand-blue-deep);
+
+  --muted: #f1f5f7;
+  --muted-foreground: #6b7280;
+
+  --accent: var(--brand-orange);
+  --accent-foreground: #ffffff;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: var(--brand-blue);
+
+  /* Semantic status colours. Office indicator and target state only - these are
+     deliberately NOT brand colours, so they read as status, not decoration. */
+  --status-present: #16a34a;
+  --status-absent: #dc2626;
+  --status-late: #f59e0b;
+  --status-missing: #94a3b8;
+}
+
+.dark {
+  --background: #0f1720;
+  --foreground: #e8eef2;
+
+  --card: #16212c;
+  --card-foreground: #e8eef2;
+  --popover: #16212c;
+  --popover-foreground: #e8eef2;
+
+  --primary: #3b9dc4;
+  --primary-foreground: #06202b;
+
+  --secondary: #1e2c38;
+  --secondary-foreground: #e8eef2;
+
+  --muted: #1e2c38;
+  --muted-foreground: #9bacb8;
+
+  --accent: var(--brand-orange);
+  --accent-foreground: #2a1a00;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #26343f;
+  --input: #26343f;
+  --ring: #3b9dc4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-deep: var(--brand-blue-deep);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-grey: var(--brand-grey);
+
+  --color-status-present: var(--status-present);
+  --color-status-absent: var(--status-absent);
+  --color-status-late: var(--status-late);
+  --color-status-missing: var(--status-missing);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Mobile-first: the daily form is used one-handed, outdoors, in a hurry. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numeric inputs are the core interaction. Kill the spinner arrows so the
+     large touch targets are not fighting a 12px stepper. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+}
+
+@layer utilities {
+  /* Respect the iOS home indicator under the fixed bottom navigation. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

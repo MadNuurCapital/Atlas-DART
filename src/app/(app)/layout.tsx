@@ -4,6 +4,7 @@ import { SideNav } from "@/components/app-shell/side-nav";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
+import { Toaster } from "@/components/ui/sonner";
 import { formatSgDate, sgToday } from "@/lib/sg-date";
 
 export default async function AppLayout({
@@ -44,6 +45,7 @@ export default async function AppLayout({
       </div>
 
       <BottomNav />
+      <Toaster />
     </div>
   );
 }

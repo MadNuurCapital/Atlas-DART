@@ -64,6 +64,15 @@ export default async function NotificationsPage() {
             and nothing makes a sound after midnight. Submitting is the only
             way to make it leave you alone — which is rather the point.
           </p>
+
+          {profile.role === "admin" && (
+            <p className="mt-2 rounded-md border border-border bg-muted px-3 py-2.5 text-xs text-muted-foreground">
+              As an admin you also get the 6 AM notification naming everyone who
+              missed the day before — on the same devices as below, so enabling
+              notifications here is what makes that arrive. If everyone
+              submitted, it comes through silently.
+            </p>
+          )}
         </CardContent>
       </Card>
 

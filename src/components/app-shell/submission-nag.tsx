@@ -51,8 +51,11 @@ export function SubmissionNag({
         "flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3",
         tone,
         // Subtle enough not to be obnoxious on a desktop left open, obvious
-        // enough to catch an eye at 10pm.
-        (level === "urgent" || level === "final") && "animate-pulse",
+        // enough to catch an eye at 10pm. Stops entirely for anyone who has
+        // asked their device to reduce motion - the colour and the wording
+        // already carry the urgency without it.
+        (level === "urgent" || level === "final") &&
+          "animate-pulse motion-reduce:animate-none",
       )}
     >
       <CircleAlert

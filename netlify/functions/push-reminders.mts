@@ -1,6 +1,8 @@
 import type { Config } from "@netlify/functions";
 import {
   adminClient,
+  alreadySent,
+  appUrl,
   authoriseManualRun,
   findMissing,
   sgToday,
@@ -113,7 +115,7 @@ export default async function handler(request: Request) {
 
   try {
     configureVapid();
-    const appUrl = process.env.APP_URL ?? "";
+    const base = appUrl();
 
     const supabase = adminClient();
     const missing = await findMissing(supabase, businessDate);
@@ -141,14 +143,15 @@ export default async function handler(request: Request) {
       }
 
       // Already chased this person in this hour? A Netlify retry must not
-      // buzz the same phone twice.
-      const { data: already } = await supabase
-        .from("reminder_logs")
-        .select("id")
-        .eq("user_id", person.user_id)
-        .eq("business_date", businessDate)
-        .eq("reminder_type", reminderType)
-        .maybeSingle();
+      // buzz the same phone twice. A previous *failure* is retried though -
+      // if the first attempt never reached the phone, the retry is the whole
+      // point of there being one.
+      const already = await alreadySent(
+        supabase,
+        person.user_id,
+        businessDate,
+        reminderType,
+      );
 
       if (already || dryRun) {
         skipped += 1;
@@ -161,8 +164,8 @@ export default async function handler(request: Request) {
       const result = await deliver(supabase, devices, {
         ...message,
         tag: "dart-daily-reminder",
-        url: appUrl
-          ? `${appUrl}/today?date=${businessDate}`
+        url: base
+          ? `${base}/today?date=${businessDate}`
           : `/today?date=${businessDate}`,
       });
 

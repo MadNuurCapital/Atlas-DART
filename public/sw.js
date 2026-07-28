@@ -38,7 +38,9 @@ self.addEventListener("push", (event) => {
     // lock screen rather than waking the whole team at 3am.
     silent: Boolean(payload.silent),
     data: { url: payload.url || "/today" },
-    actions: [{ action: "submit", title: "Submit now" }],
+    // The label follows the payload: the 6am digest to an admin says "See who",
+    // not "Submit now", because there is nothing for them to submit.
+    actions: [{ action: "open", title: payload.action || "Submit now" }],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

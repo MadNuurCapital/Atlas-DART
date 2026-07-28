@@ -27,6 +27,8 @@ export type PushPayload = {
   body: string;
   url: string;
   tag: string;
+  /** Label on the notification's button. "Submit now" if omitted. */
+  action?: string;
   requireInteraction?: boolean;
   silent?: boolean;
 };

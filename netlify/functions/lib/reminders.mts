@@ -224,8 +224,15 @@ export function authoriseManualRun(request: Request): boolean {
   return token === expected || fromQuery === expected;
 }
 
+/**
+ * The site's base URL, without a trailing slash.
+ *
+ * APP_URL is typed into the Netlify dashboard by hand, and "https://site/" is
+ * at least as likely as "https://site". Trimming here means every link built
+ * from it is correct rather than each caller having to remember.
+ */
 export function appUrl(): string {
-  return process.env.APP_URL ?? "";
+  return (process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
 }
 
 const BRAND_BLUE = "#1e7fa6";

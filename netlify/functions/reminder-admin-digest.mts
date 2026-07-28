@@ -3,6 +3,7 @@ import {
   adminClient,
   adminDigestEmail,
   alreadySent,
+  appUrl,
   authoriseManualRun,
   emailConfigured,
   findAdmins,
@@ -114,7 +115,7 @@ export default async function handler(request: Request) {
     if (!dryRun && process.env.VAPID_PRIVATE_KEY) {
       configureVapid();
 
-      const appUrl = process.env.APP_URL ?? "";
+      const base = appUrl();
       const notification = digestPush(missing, businessDate);
       const devicesByAdmin = await loadDevices(
         supabase,
@@ -143,8 +144,9 @@ export default async function handler(request: Request) {
         const result = await deliver(supabase, devices, {
           ...notification,
           tag: "dart-admin-digest",
-          url: appUrl
-            ? `${appUrl}/admin/daily?date=${businessDate}`
+          action: missing.length === 0 ? "Open" : "See who",
+          url: base
+            ? `${base}/admin/daily?date=${businessDate}`
             : `/admin/daily?date=${businessDate}`,
         });
 

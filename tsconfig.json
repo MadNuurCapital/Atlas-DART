@@ -14,6 +14,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Netlify's function bundler resolves sibling modules by their literal
+    // .mts path, so the scheduled functions must import with the extension.
+    // Safe here because noEmit is on - nothing is written out.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

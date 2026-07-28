@@ -10,18 +10,18 @@ Replaces the per-consultant `Consultant_XXX.numbers` workbooks.
 
 ## Status
 
-**Phase 1 complete — foundation.** Sign-in, sessions, the full database schema, and the Row Level Security policies are built and tested.
+**All six phases complete.** The MVP is feature-complete and awaiting the client's Supabase, Netlify and Resend accounts.
 
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Scaffold, schema, RLS, auth, app shell | **Done** |
-| 2 | Daily submission + appointments | Next |
-| 3 | Cases, insurers, targets | Planned |
-| 4 | Admin dashboard + Realtime | Planned |
-| 5 | Six-sheet Excel export | Planned |
-| 6 | Reminders, audit logging, docs | Planned |
+| 2 | Daily submission + appointments | **Done** |
+| 3 | Cases, insurers, targets | **Done** |
+| 4 | Admin dashboard + Realtime | **Done** |
+| 5 | Six-sheet Excel export | **Done** |
+| 6 | Reminders, audit logging, docs | **Done** |
 
-Routes for later phases exist and are access-controlled, but show an honest "arrives in Phase N" placeholder rather than an empty screen that looks like real data.
+Not yet built, and deliberately: the `/admin/users` invite screen agreed after Phase 1. It needs a live Supabase project to be worth testing.
 
 ## Stack
 
@@ -69,10 +69,10 @@ export TEST_DATABASE_URL="postgresql://dart_test:dart_test@127.0.0.1:5432/dart_t
 
 ## Test coverage today
 
-**121 tests, all passing.**
+**199 tests, all passing.**
 
-- **46 unit** — Singapore date handling including the UTC-midnight boundary, deadline and on-time derivation, target and shortfall arithmetic, compliance percentages, and a guard proving the service-role key cannot reach the browser.
-- **61 database** — the Row Level Security matrix executed against real PostgreSQL 16: cross-consultant isolation, privilege escalation, the 7-day edit window, deletion being impossible, submission-timing triggers, cancellation and restoration, insurer de-duplication, and target history.
+- **112 unit** — Singapore date handling including the UTC-midnight boundary, deadline and on-time derivation, target and shortfall arithmetic, compliance percentages, all validation schemas, the Excel workbook (cell *types*, not just values), reminder scheduling and email content, and a guard proving the service-role key cannot reach the browser.
+- **73 database** — the Row Level Security matrix executed against real PostgreSQL 16: cross-consultant isolation, privilege escalation, the 7-day edit window, deletion being impossible, submission-timing triggers, cancellation and restoration, insurer de-duplication, target history, reminder idempotency, and the Realtime publication.
 - **14 end-to-end** — authentication and access control on mobile and desktop viewports.
 
 ## Key decisions
@@ -102,8 +102,10 @@ See [`docs/security.md`](docs/security.md).
 
 ## Documentation
 
+- [`docs/architecture.md`](docs/architecture.md) — how it fits together, and what is deliberately absent
 - [`docs/database.md`](docs/database.md) — schema, triggers, views
 - [`docs/security.md`](docs/security.md) — RLS model and threat notes
 - [`docs/testing.md`](docs/testing.md) — how to run everything
-- `docs/netlify-deployment.md` — Phase 6
-- `docs/reminder-function.md` — Phase 6
+- [`docs/netlify-deployment.md`](docs/netlify-deployment.md) — first deploy, env vars, rollback
+- [`docs/reminder-function.md`](docs/reminder-function.md) — the two crons and how to test them before they run unattended
+- [`docs/manual-test-checklist.md`](docs/manual-test-checklist.md) — the on-a-real-phone pass before launch

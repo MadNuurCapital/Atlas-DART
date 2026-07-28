@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
@@ -22,6 +23,21 @@ export type UserActionResult = {
  * Long and random rather than memorable: it exists to be copied once and then
  * changed by the recipient, not typed from memory.
  */
+/**
+ * The origin this request actually arrived on.
+ *
+ * Used when APP_URL is missing or obviously a placeholder, so an invitation
+ * still points at the site the admin is standing on rather than at whatever
+ * the Supabase dashboard has in its Site URL field.
+ */
+async function currentOrigin(): Promise<string | undefined> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return undefined;
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
+
 function temporaryPassword(): string {
   const alphabet =
     "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -76,9 +92,23 @@ export async function inviteUser(
 
   const service = createAdminClient();
   const metadata = { full_name: fullName, role };
-  const redirectTo = process.env.APP_URL
-    ? `${process.env.APP_URL}/login`
-    : undefined;
+
+  // Where the invitation link lands. /auth/callback turns the token into a
+  // session and forwards to /set-password, because an invited person has no
+  // password yet and /login cannot help them.
+  //
+  // Falling back to the request's own origin matters: if APP_URL is unset or
+  // still a placeholder, Supabase drops back to its dashboard Site URL, which
+  // ships as http://localhost:3000 and sends every invitee nowhere.
+  const configured = process.env.APP_URL?.trim();
+  const looksReal =
+    configured &&
+    /^https?:\/\//.test(configured) &&
+    !configured.includes("placeholder") &&
+    !configured.includes("localhost");
+
+  const base = looksReal ? configured.replace(/\/$/, "") : await currentOrigin();
+  const redirectTo = base ? `${base}/auth/callback` : undefined;
 
   // Preferred path: an email letting them choose their own password.
   const invite = await service.auth.admin.inviteUserByEmail(email, {

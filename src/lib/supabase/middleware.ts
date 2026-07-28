@@ -2,7 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
-/** Routes reachable without a session. Everything else requires sign-in. */
+/**
+ * Routes reachable without a session.
+ *
+ * /auth/callback must be public: it is where an emailed invitation lands, and
+ * at that moment the visitor has no session yet - establishing one is the
+ * entire job of that page.
+ */
 const PUBLIC_PATHS = ["/login", "/auth"];
 
 function isPublicPath(pathname: string): boolean {

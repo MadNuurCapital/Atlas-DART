@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminCasesPage() {
   await requireAdmin();
-  const { cases, insurers } = await fetchCases();
+  const { cases, insurers, truncated } = await fetchCases();
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4">
@@ -26,6 +26,7 @@ export default async function AdminCasesPage() {
         isAdmin
         showConsultant
         canAdd={false}
+        truncated={truncated}
       />
     </div>
   );

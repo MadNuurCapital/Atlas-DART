@@ -231,3 +231,80 @@ describe("hourly push nag logging", () => {
     });
   });
 });
+
+describe("giving up on a dead device", () => {
+  it("excludes a subscription once it has failed enough times", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await asOwner(c);
+
+      await c.query(
+        `insert into public.push_subscriptions
+           (user_id, endpoint, p256dh, auth, failure_count)
+         values ($1, 'https://push.example/dead', 'k', 'a', 5),
+                ($1, 'https://push.example/alive', 'k', 'a', 2)`,
+        [a.id],
+      );
+
+      // This is the filter the sender uses. A device that has failed five
+      // times is not worth a request per person per hour forever.
+      const { rows } = await c.query<{ endpoint: string }>(
+        "select endpoint from public.push_subscriptions where failure_count < 5",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.endpoint).toContain("alive");
+    });
+  });
+
+  it("counts failures upward rather than pinning them at one", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await asOwner(c);
+      await c.query(
+        `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
+         values ($1, 'https://push.example/flaky', 'k', 'a')`,
+        [a.id],
+      );
+
+      // Five consecutive failures must actually reach the threshold. Setting
+      // the count to 1 each time - which is what the sender used to do - meant
+      // it never did, and the give-up logic was unreachable.
+      for (let i = 0; i < 5; i += 1) {
+        const { rows } = await c.query<{ failure_count: number }>(
+          "select failure_count from public.push_subscriptions where user_id = $1",
+          [a.id],
+        );
+        await c.query(
+          "update public.push_subscriptions set failure_count = $2 where user_id = $1",
+          [a.id, rows[0]!.failure_count + 1],
+        );
+      }
+
+      const { rows } = await c.query<{ failure_count: number }>(
+        "select failure_count from public.push_subscriptions where user_id = $1",
+        [a.id],
+      );
+      expect(rows[0]!.failure_count).toBe(5);
+
+      const live = await c.query(
+        "select * from public.push_subscriptions where failure_count < 5",
+      );
+      expect(live.rows).toHaveLength(0);
+    });
+  });
+
+  it("refuses a negative failure count", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await asOwner(c);
+      await expectRejection(() =>
+        c.query(
+          `insert into public.push_subscriptions
+             (user_id, endpoint, p256dh, auth, failure_count)
+           values ($1, 'https://push.example/x', 'k', 'a', -1)`,
+          [a.id],
+        ),
+      );
+    });
+  });
+});

@@ -135,7 +135,7 @@ export default async function handler(request: Request) {
     // rather than a query per person.
     const { data: subs } = await supabase
       .from("push_subscriptions")
-      .select("id, user_id, endpoint, p256dh, auth")
+      .select("id, user_id, endpoint, p256dh, auth, failure_count")
       .in(
         "user_id",
         missing.map((m) => m.user_id),
@@ -199,6 +199,21 @@ export default async function handler(request: Request) {
           );
           deliveredToAny = true;
           sent += 1;
+
+          // Clear any accumulated failures. Without this a device that had a
+          // few transient errors over previous days would eventually cross the
+          // threshold and go silent despite working perfectly.
+          if (device.failure_count > 0) {
+            await supabase
+              .from("push_subscriptions")
+              .update({ failure_count: 0, last_used_at: new Date().toISOString() })
+              .eq("id", device.id);
+          } else {
+            await supabase
+              .from("push_subscriptions")
+              .update({ last_used_at: new Date().toISOString() })
+              .eq("id", device.id);
+          }
         } catch (error) {
           const status = (error as { statusCode?: number }).statusCode;
           lastError = error instanceof Error ? error.message : String(error);
@@ -212,9 +227,12 @@ export default async function handler(request: Request) {
               .eq("id", device.id);
             removed += 1;
           } else {
+            // INCREMENT, not set. Setting it to 1 each time meant it never
+            // reached the threshold, so a permanently broken endpoint was
+            // retried every hour forever and the give-up logic never ran.
             await supabase
               .from("push_subscriptions")
-              .update({ failure_count: 1 })
+              .update({ failure_count: device.failure_count + 1 })
               .eq("id", device.id);
             failed += 1;
           }

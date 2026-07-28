@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CasesPage() {
   const profile = await requireProfile();
-  const { cases, insurers } = await fetchCases();
+  const { cases, insurers, truncated } = await fetchCases();
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
@@ -24,6 +24,7 @@ export default async function CasesPage() {
         cases={cases}
         insurers={insurers}
         isAdmin={profile.role === "admin"}
+        truncated={truncated}
       />
     </div>
   );

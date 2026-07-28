@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Search,
   Clock,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cancelCase, restoreCase } from "@/app/(app)/cases/actions";
@@ -27,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency } from "@/lib/constants";
+import { CASE_PAGE_LIMIT, formatCurrency } from "@/lib/constants";
 import { formatSgDate } from "@/lib/sg-date";
 import type { Case, Insurer } from "@/types/database";
 
@@ -282,12 +283,15 @@ export function CaseList({
   isAdmin,
   showConsultant = false,
   canAdd = true,
+  truncated = false,
 }: {
   cases: CaseWithInsurer[];
   insurers: Insurer[];
   isAdmin: boolean;
   showConsultant?: boolean;
   canAdd?: boolean;
+  /** The server hit its row cap, so the oldest cases are not on this page. */
+  truncated?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [month, setMonth] = useState("");
@@ -366,6 +370,17 @@ export function CaseList({
           Cancelled ({cancelledCount})
         </Button>
       </div>
+
+      {truncated && (
+        <p className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            Showing the {CASE_PAGE_LIMIT.toLocaleString("en-SG")} most recent
+            cases, so the counts and GR total on this page cover only those.
+            Dashboard figures and the monthly export still use every case.
+          </span>
+        </p>
+      )}
 
       {!showCancelled && filtered.length > 0 && (
         <p className="text-sm text-muted-foreground">

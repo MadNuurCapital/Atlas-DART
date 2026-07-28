@@ -118,6 +118,21 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(n);
 }
 
+/**
+ * The most cases loaded onto a case list page at once.
+ *
+ * The list filters on the client so search and the month picker feel instant,
+ * which means everything has to reach the browser. That is fine for a
+ * consultant's own book and fine for a team's first couple of years, but it is
+ * not fine forever - and an unbounded query that quietly gets slower every
+ * month is the kind of thing nobody notices until it is painful.
+ *
+ * Newest first, so the cap drops the oldest cases rather than a random slice,
+ * and the list says plainly when it has been reached. Dashboard totals and the
+ * monthly export aggregate in Postgres and are not capped.
+ */
+export const CASE_PAGE_LIMIT = 1000;
+
 /** Excel number formats. Kept here so the export and the UI cannot drift. */
 export const EXCEL_CURRENCY_FORMAT = '"S$"#,##0.00';
 export const EXCEL_PERCENT_FORMAT = "0.0%";

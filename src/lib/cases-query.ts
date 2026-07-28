@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { CASE_PAGE_LIMIT } from "@/lib/constants";
 import type { CaseWithInsurer } from "@/components/cases/case-list";
 import type { Insurer } from "@/types/database";
 
@@ -34,6 +35,7 @@ type CaseJoinRow = {
 export async function fetchCases(): Promise<{
   cases: CaseWithInsurer[];
   insurers: Insurer[];
+  truncated: boolean;
 }> {
   const supabase = await createClient();
 
@@ -43,7 +45,8 @@ export async function fetchCases(): Promise<{
       .select(
         "*, insurers ( name ), profiles!cases_consultant_id_fkey ( full_name )",
       )
-      .order("date_submitted", { ascending: false }),
+      .order("date_submitted", { ascending: false })
+      .limit(CASE_PAGE_LIMIT),
     supabase
       .from("insurers")
       .select("*")
@@ -59,5 +62,9 @@ export async function fetchCases(): Promise<{
     consultant_name: row.profiles?.full_name,
   })) as CaseWithInsurer[];
 
-  return { cases, insurers: (insurerRows as Insurer[]) ?? [] };
+  return {
+    cases,
+    insurers: (insurerRows as Insurer[]) ?? [],
+    truncated: cases.length >= CASE_PAGE_LIMIT,
+  };
 }

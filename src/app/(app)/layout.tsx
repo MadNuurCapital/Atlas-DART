@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { KeyRound } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { BottomNav } from "@/components/app-shell/bottom-nav";
 import { SideNav } from "@/components/app-shell/side-nav";
@@ -33,11 +35,22 @@ export default async function AppLayout({
             </p>
           </div>
 
-          <form action={signOut}>
-            <Button type="submit" variant="ghost" size="sm">
-              Sign out
+          <div className="flex shrink-0 items-center gap-1">
+            {/* Anyone handed a temporary password needs somewhere to change
+                it. Without this the invite dialog's advice is unfollowable. */}
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/set-password">
+                <KeyRound aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">Password</span>
+              </Link>
             </Button>
-          </form>
+
+            <form action={signOut}>
+              <Button type="submit" variant="ghost" size="sm">
+                Sign out
+              </Button>
+            </form>
+          </div>
         </header>
 
         {/* pb-20 clears the fixed bottom navigation on mobile. */}

@@ -47,6 +47,7 @@ create index if not exists daily_submissions_submitted_idx
   on public.daily_submissions (business_date)
   where status = 'submitted';
 
+drop trigger if exists daily_submissions_set_updated_at on public.daily_submissions;
 create trigger daily_submissions_set_updated_at
   before update on public.daily_submissions
   for each row execute function public.set_updated_at();
@@ -115,6 +116,7 @@ begin
 end;
 $$;
 
+drop trigger if exists daily_submissions_timing on public.daily_submissions;
 create trigger daily_submissions_timing
   before insert or update on public.daily_submissions
   for each row execute function public.handle_submission_timing();

@@ -19,6 +19,7 @@ create table if not exists public.profiles (
 create index if not exists profiles_active_idx on public.profiles (active) where active;
 create index if not exists profiles_role_idx on public.profiles (role);
 
+drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute function public.set_updated_at();
@@ -93,6 +94,7 @@ begin
 end;
 $$;
 
+drop trigger if exists profiles_guard_columns on public.profiles;
 create trigger profiles_guard_columns
   before update on public.profiles
   for each row execute function public.guard_profile_columns();

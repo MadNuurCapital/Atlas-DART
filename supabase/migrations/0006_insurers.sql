@@ -25,6 +25,7 @@ create unique index if not exists insurers_name_unique
 create index if not exists insurers_active_idx
   on public.insurers (active) where active;
 
+drop trigger if exists insurers_set_updated_at on public.insurers;
 create trigger insurers_set_updated_at
   before update on public.insurers
   for each row execute function public.set_updated_at();
@@ -41,6 +42,7 @@ begin
 end;
 $$;
 
+drop trigger if exists insurers_normalise_name on public.insurers;
 create trigger insurers_normalise_name
   before insert or update on public.insurers
   for each row execute function public.normalise_insurer_name();

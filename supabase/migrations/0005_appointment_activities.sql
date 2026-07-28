@@ -28,6 +28,7 @@ create index if not exists appointment_activities_submission_idx
 create index if not exists appointment_activities_type_idx
   on public.appointment_activities (business_date, appointment_type);
 
+drop trigger if exists appointment_activities_set_updated_at on public.appointment_activities;
 create trigger appointment_activities_set_updated_at
   before update on public.appointment_activities
   for each row execute function public.set_updated_at();
@@ -65,6 +66,7 @@ begin
 end;
 $$;
 
+drop trigger if exists appointment_activities_enforce_parent on public.appointment_activities;
 create trigger appointment_activities_enforce_parent
   before insert or update on public.appointment_activities
   for each row execute function public.enforce_appointment_parent();

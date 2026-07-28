@@ -36,15 +36,18 @@ revoke all on all tables in schema public from anon;
 -- Column-level protection (role, active) is handled by guard_profile_columns
 -- in 0002 - RLS grants whole rows and cannot express "not this column".
 -- ---------------------------------------------------------------------------
+drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles
   for select to authenticated
   using (id = auth.uid() or public.is_admin());
 
+drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
   for update to authenticated
   using (id = auth.uid() or public.is_admin())
   with check (id = auth.uid() or public.is_admin());
 
+drop policy if exists profiles_insert_admin on public.profiles;
 create policy profiles_insert_admin on public.profiles
   for insert to authenticated
   with check (public.is_admin());
@@ -55,19 +58,23 @@ create policy profiles_insert_admin on public.profiles
 -- see their number but cannot touch it. The audit trail is what keeps a
 -- self-editing admin accountable.
 -- ---------------------------------------------------------------------------
+drop policy if exists targets_select on public.consultant_targets;
 create policy targets_select on public.consultant_targets
   for select to authenticated
   using (consultant_id = auth.uid() or public.is_admin());
 
+drop policy if exists targets_insert_admin on public.consultant_targets;
 create policy targets_insert_admin on public.consultant_targets
   for insert to authenticated
   with check (public.is_admin());
 
+drop policy if exists targets_update_admin on public.consultant_targets;
 create policy targets_update_admin on public.consultant_targets
   for update to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 
+drop policy if exists targets_delete_admin on public.consultant_targets;
 create policy targets_delete_admin on public.consultant_targets
   for delete to authenticated
   using (public.is_admin());
@@ -78,10 +85,12 @@ create policy targets_delete_admin on public.consultant_targets
 -- 7-day window. Admins are unrestricted; their overrides are audit-logged by
 -- the application.
 -- ---------------------------------------------------------------------------
+drop policy if exists submissions_select on public.daily_submissions;
 create policy submissions_select on public.daily_submissions
   for select to authenticated
   using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists submissions_insert_own on public.daily_submissions;
 create policy submissions_insert_own on public.daily_submissions
   for insert to authenticated
   with check (
@@ -89,6 +98,7 @@ create policy submissions_insert_own on public.daily_submissions
     or (user_id = auth.uid() and public.within_edit_window(business_date))
   );
 
+drop policy if exists submissions_update_own on public.daily_submissions;
 create policy submissions_update_own on public.daily_submissions
   for update to authenticated
   using (
@@ -108,10 +118,12 @@ create policy submissions_update_own on public.daily_submissions
 -- enforce_appointment_parent (0005) BEFORE these checks run, so attaching an
 -- appointment to somebody else's submission fails the WITH CHECK below.
 -- ---------------------------------------------------------------------------
+drop policy if exists appointments_select on public.appointment_activities;
 create policy appointments_select on public.appointment_activities
   for select to authenticated
   using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists appointments_insert_own on public.appointment_activities;
 create policy appointments_insert_own on public.appointment_activities
   for insert to authenticated
   with check (
@@ -119,6 +131,7 @@ create policy appointments_insert_own on public.appointment_activities
     or (user_id = auth.uid() and public.within_edit_window(business_date))
   );
 
+drop policy if exists appointments_update_own on public.appointment_activities;
 create policy appointments_update_own on public.appointment_activities
   for update to authenticated
   using (
@@ -133,6 +146,7 @@ create policy appointments_update_own on public.appointment_activities
 -- Appointments are the one thing a consultant may genuinely remove: deleting a
 -- mistyped appointment must adjust the AO/AC/FU/N counts, and there is no
 -- reporting history to protect at the individual appointment level.
+drop policy if exists appointments_delete_own on public.appointment_activities;
 create policy appointments_delete_own on public.appointment_activities
   for delete to authenticated
   using (
@@ -146,14 +160,17 @@ create policy appointments_delete_own on public.appointment_activities
 -- 0006 is what stops that fragmenting the reporting.
 -- Retiring or renaming an insurer stays with admins.
 -- ---------------------------------------------------------------------------
+drop policy if exists insurers_select on public.insurers;
 create policy insurers_select on public.insurers
   for select to authenticated
   using (true);
 
+drop policy if exists insurers_insert on public.insurers;
 create policy insurers_insert on public.insurers
   for insert to authenticated
   with check (auth.uid() is not null);
 
+drop policy if exists insurers_update_admin on public.insurers;
 create policy insurers_update_admin on public.insurers
   for update to authenticated
   using (public.is_admin())
@@ -169,10 +186,12 @@ create policy insurers_update_admin on public.insurers
 -- Consultants also cannot restore: the update policy forbids moving a case
 -- from cancelled back to active. Restoration is an admin action (D15).
 -- ---------------------------------------------------------------------------
+drop policy if exists cases_select on public.cases;
 create policy cases_select on public.cases
   for select to authenticated
   using (consultant_id = auth.uid() or public.is_admin());
 
+drop policy if exists cases_insert_own on public.cases;
 create policy cases_insert_own on public.cases
   for insert to authenticated
   with check (public.is_admin() or consultant_id = auth.uid());
@@ -180,6 +199,7 @@ create policy cases_insert_own on public.cases
 -- A policy sees only the row being written, so "was it cancelled before?" is
 -- not a question it can answer. The cancelled -> active transition is blocked
 -- by guard_case_restore() in 0007 instead, which can see OLD and NEW.
+drop policy if exists cases_update_own on public.cases;
 create policy cases_update_own on public.cases
   for update to authenticated
   using (public.is_admin() or consultant_id = auth.uid())
@@ -190,6 +210,7 @@ create policy cases_update_own on public.cases
 -- admin can audit the mailer. Written only by the scheduled functions, which
 -- use the service role and bypass RLS.
 -- ---------------------------------------------------------------------------
+drop policy if exists reminder_logs_select on public.reminder_logs;
 create policy reminder_logs_select on public.reminder_logs
   for select to authenticated
   using (user_id = auth.uid() or public.is_admin());
@@ -198,10 +219,12 @@ create policy reminder_logs_select on public.reminder_logs
 -- audit_logs - append only. There is deliberately no UPDATE or DELETE policy
 -- for anyone, including admins.
 -- ---------------------------------------------------------------------------
+drop policy if exists audit_logs_select_admin on public.audit_logs;
 create policy audit_logs_select_admin on public.audit_logs
   for select to authenticated
   using (public.is_admin() or actor_user_id = auth.uid());
 
+drop policy if exists audit_logs_insert on public.audit_logs;
 create policy audit_logs_insert on public.audit_logs
   for insert to authenticated
   with check (actor_user_id = auth.uid());

@@ -72,6 +72,7 @@ create index if not exists cases_pending_inception_idx
 create index if not exists cases_insurer_idx on public.cases (insurer_id);
 create index if not exists cases_policy_type_idx on public.cases (policy_type);
 
+drop trigger if exists cases_set_updated_at on public.cases;
 create trigger cases_set_updated_at
   before update on public.cases
   for each row execute function public.set_updated_at();
@@ -110,6 +111,7 @@ begin
 end;
 $$;
 
+drop trigger if exists cases_guard_restore on public.cases;
 create trigger cases_guard_restore
   before update on public.cases
   for each row execute function public.guard_case_restore();

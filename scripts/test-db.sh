@@ -102,6 +102,27 @@ for f in "$MIGRATIONS_DIR"/*.sql; do
   owner_psql -q -f "$f"
 done
 
+# Apply everything a second time.
+#
+# Migrations must be re-runnable: a partial apply in the Supabase SQL editor is
+# normal, and the fix is always "run it again". Postgres has no
+# CREATE TRIGGER IF NOT EXISTS and no CREATE POLICY IF NOT EXISTS, so every one
+# of those needs an explicit DROP first - easy to forget, and invisible until
+# somebody re-runs the file against a real project.
+#
+# This second pass is the only thing that would catch that, so it runs every
+# time rather than living in a script nobody remembers.
+echo "==> Re-applying to prove the migrations are idempotent"
+for f in "$MIGRATIONS_DIR"/*.sql; do
+  if ! owner_psql -q -f "$f" >/dev/null 2>&1; then
+    echo
+    echo "NOT IDEMPOTENT: $(basename "$f") fails on a second apply." >&2
+    echo "Re-running it to show the error:" >&2
+    owner_psql -f "$f" >/dev/null || true
+    exit 1
+  fi
+done
+
 echo
 echo "Ready. Export this for the test suite:"
 echo "  export TEST_DATABASE_URL=\"postgresql://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_NAME\""

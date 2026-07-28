@@ -33,6 +33,7 @@ create unique index if not exists consultant_targets_unique
 create index if not exists consultant_targets_lookup_idx
   on public.consultant_targets (consultant_id, year);
 
+drop trigger if exists consultant_targets_set_updated_at on public.consultant_targets;
 create trigger consultant_targets_set_updated_at
   before update on public.consultant_targets
   for each row execute function public.set_updated_at();

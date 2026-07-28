@@ -12,8 +12,8 @@ import type { Profile } from "@/types/database";
  * within a single request's render pass. That matters far more than it looks:
  * a page like /admin/daily asks three times over - once in the app layout,
  * once in the admin layout, once in the page itself - and each ask was
- * previously a full getUser() round trip to Supabase Auth plus a profiles
- * SELECT. Six network hops to answer one question.
+ * previously a full round trip to Supabase Auth plus a profiles SELECT. Six
+ * network hops to answer one question.
  *
  * With cache() the first call pays, the rest are free, and the answer is
  * guaranteed consistent across the whole render rather than three separate
@@ -26,22 +26,28 @@ import type { Profile } from "@/types/database";
 const loadProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
 
-  // getUser() revalidates against the Auth server rather than trusting a
-  // cookie the browser could have tampered with. It is the expensive call,
-  // which is exactly why it is behind cache().
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the access token's signature before returning
+  // anything, so the id below is as trustworthy as getUser()'s - but on a
+  // project using asymmetric signing keys it does that verification locally
+  // with WebCrypto instead of asking the Auth server, which removes a round
+  // trip from the front of every single page load. On a project still using
+  // the legacy shared secret it transparently falls back to asking the
+  // server, so this is never worse than what it replaces.
+  //
+  // What it is emphatically NOT is getSession(), which decodes the cookie
+  // without checking the signature and would trust anything the browser sent.
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
 
-  if (!user) return null;
+  if (!userId) return null;
 
-  const { data } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
-  return data ?? null;
+  return profile ?? null;
 });
 
 /**

@@ -10,7 +10,12 @@ export const config = {
     /*
      * Everything except static assets and image optimisation. The session must
      * be refreshed on real page and action requests, not on every icon fetch.
+     *
+     * sw.js and the manifest are excluded deliberately. The browser re-fetches
+     * the service worker on navigation and the manifest on load, and neither
+     * carries a session or renders anything - running an auth check on them
+     * only added latency to the first paint.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

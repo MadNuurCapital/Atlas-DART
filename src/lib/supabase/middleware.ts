@@ -48,11 +48,18 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // getUser() revalidates against the Auth server. Do not swap this for
-  // getSession(), which trusts a cookie the browser could have tampered with.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the access token's signature - locally via WebCrypto
+  // where the project uses asymmetric signing keys, otherwise by asking the
+  // Auth server exactly as getUser() would. Local verification is the point:
+  // middleware runs ahead of every navigation, every server action and every
+  // prefetch, so a network round trip here is paid before the page has begun.
+  //
+  // It still refreshes an access token that is close to expiring, which is
+  // the other half of what this middleware exists to do.
+  //
+  // Do not swap this for getSession(), which trusts a cookie unverified.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims?.sub ? claimsData.claims : null;
 
   const { pathname } = request.nextUrl;
 

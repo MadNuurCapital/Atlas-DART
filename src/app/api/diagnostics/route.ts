@@ -16,21 +16,32 @@ export const runtime = "nodejs";
 export async function GET() {
   const supabase = await createClient();
 
-  const started = Date.now();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const authMs = Date.now() - started;
+  // What the app actually does now. On a project with asymmetric signing keys
+  // this is local signature verification and costs almost nothing; the first
+  // call may fetch the JWKS, so a second is timed to show the cached cost.
+  const claimsStart = Date.now();
+  const { data: claims } = await supabase.auth.getClaims();
+  const claimsColdMs = Date.now() - claimsStart;
 
-  if (!user) {
+  const userId = claims?.claims?.sub;
+  if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
+
+  const claimsWarmStart = Date.now();
+  await supabase.auth.getClaims();
+  const claimsWarmMs = Date.now() - claimsWarmStart;
+
+  // What it used to do, for comparison. Always a network round trip.
+  const started = Date.now();
+  await supabase.auth.getUser();
+  const authMs = Date.now() - started;
 
   const profileStart = Date.now();
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
   const profileMs = Date.now() - profileStart;
 
@@ -73,8 +84,17 @@ export async function GET() {
   return NextResponse.json(
     {
       verdict,
+      auth: {
+        // "ES256"/"RS256" means signatures are checked locally - fast.
+        // "HS256" means the project is still on the legacy shared secret and
+        // every check is a network call; migrating signing keys in the
+        // Supabase dashboard would remove a round trip from every page.
+        signingAlgorithm: claims?.header?.alg ?? "unknown",
+        verifyFirstCallMs: claimsColdMs,
+        verifyCachedMs: claimsWarmMs,
+        oldGetUserRoundTripMs: authMs,
+      },
       timings: {
-        authRoundTripMs: authMs,
         profileQueryMs: profileMs,
         singleQueryMs: pingMs,
         threeQueriesSerialMs: serialMs,

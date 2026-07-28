@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleCheck, CircleAlert, ArrowRight } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
+import { unwrap } from "@/lib/query";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,42 +50,47 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  const [
-    { data: todayRow },
-    { data: monthRows },
-    { data: targetRow },
-    { data: pendingRow },
-    { data: mixRows },
-  ] = await Promise.all([
-    supabase
-      .from("v_daily_consultant_summary")
-      .select("*")
-      .eq("user_id", profile.id)
-      .eq("business_date", today)
-      .maybeSingle(),
-    supabase
-      .from("v_daily_consultant_summary")
-      .select("*")
-      .eq("user_id", profile.id)
-      .gte("business_date", monthStart)
-      .lte("business_date", today),
-    supabase
-      .from("v_target_shortfall")
-      .select("*")
-      .eq("consultant_id", profile.id)
-      .maybeSingle(),
-    supabase
-      .from("v_pending_inception")
-      .select("*")
-      .eq("consultant_id", profile.id)
-      .maybeSingle(),
-    supabase
-      .from("v_case_mix_by_category")
-      .select("*")
-      .eq("consultant_id", profile.id)
-      .eq("year", year)
-      .eq("month", month),
-  ]);
+  const [todayRes, monthRes, targetRes, pendingRes, mixRes] = await Promise.all(
+    [
+      supabase
+        .from("v_daily_consultant_summary")
+        .select("*")
+        .eq("user_id", profile.id)
+        .eq("business_date", today)
+        .maybeSingle(),
+      supabase
+        .from("v_daily_consultant_summary")
+        .select("*")
+        .eq("user_id", profile.id)
+        .gte("business_date", monthStart)
+        .lte("business_date", today),
+      supabase
+        .from("v_target_shortfall")
+        .select("*")
+        .eq("consultant_id", profile.id)
+        .maybeSingle(),
+      supabase
+        .from("v_pending_inception")
+        .select("*")
+        .eq("consultant_id", profile.id)
+        .maybeSingle(),
+      supabase
+        .from("v_case_mix_by_category")
+        .select("*")
+        .eq("consultant_id", profile.id)
+        .eq("year", year)
+        .eq("month", month),
+    ],
+  );
+
+  // A failed read must not render as a zero. Showing S$0 to someone who has
+  // written business this month is worse than an error screen, because they
+  // have no way to tell it apart from the truth.
+  const todayRow = unwrap(todayRes, "today's submission");
+  const monthRows = unwrap(monthRes, "this month's submissions");
+  const targetRow = unwrap(targetRes, "your target");
+  const pendingRow = unwrap(pendingRes, "pending inceptions");
+  const mixRows = unwrap(mixRes, "the category mix");
 
   const summary = (todayRow as DailyConsultantSummary | null) ?? null;
   const month_ = (monthRows as DailyConsultantSummary[]) ?? [];
@@ -192,7 +198,10 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Submitted" value={`${submittedDays}/${requiredDays}`} />
+            <Stat
+              label="Submitted"
+              value={`${submittedDays}/${requiredDays}`}
+            />
             <Stat label="Late" value={lateDays} />
             <Stat
               label="Compliance"
@@ -214,9 +223,7 @@ export default async function DashboardPage() {
 
       {(() => {
         const yesterday = addDays(today, -1);
-        const yesterdayRow = month_.find(
-          (r) => r.business_date === yesterday,
-        );
+        const yesterdayRow = month_.find((r) => r.business_date === yesterday);
         if (yesterdayRow?.status === "submitted") return null;
         return (
           <Card className="border-dashed">

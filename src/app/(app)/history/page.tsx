@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CircleCheck, CircleAlert, Pencil } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { unwrap } from "@/lib/query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,13 +30,16 @@ export default async function HistoryPage() {
   const from = addDays(today, -LOOKBACK_DAYS);
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const res = await supabase
     .from("v_daily_consultant_summary")
     .select("*")
     .eq("user_id", profile.id)
     .gte("business_date", from)
     .lte("business_date", today)
     .order("business_date", { ascending: false });
+
+  // A failed read must not look like an empty history.
+  const data = unwrap(res, "your submission history");
 
   const rows = (data as DailyConsultantSummary[]) ?? [];
   const byDate = new Map(rows.map((r) => [r.business_date, r]));
@@ -91,9 +95,15 @@ export default async function HistoryPage() {
                       {row?.status === "submitted" && (
                         <Badge variant={row.on_time ? "success" : "warning"}>
                           {row.on_time ? (
-                            <CircleCheck className="size-3" aria-hidden="true" />
+                            <CircleCheck
+                              className="size-3"
+                              aria-hidden="true"
+                            />
                           ) : (
-                            <CircleAlert className="size-3" aria-hidden="true" />
+                            <CircleAlert
+                              className="size-3"
+                              aria-hidden="true"
+                            />
                           )}
                           {row.on_time ? "On time" : "Late"}
                         </Badge>

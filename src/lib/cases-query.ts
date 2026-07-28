@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { unwrap } from "@/lib/query";
 import { CASE_PAGE_LIMIT } from "@/lib/constants";
 import type { CaseWithInsurer } from "@/components/cases/case-list";
 import type { Insurer } from "@/types/database";
@@ -39,7 +40,7 @@ export async function fetchCases(): Promise<{
 }> {
   const supabase = await createClient();
 
-  const [{ data: caseRows }, { data: insurerRows }] = await Promise.all([
+  const [caseRes, insurerRes] = await Promise.all([
     supabase
       .from("cases")
       .select(
@@ -53,6 +54,10 @@ export async function fetchCases(): Promise<{
       .eq("active", true)
       .order("name", { ascending: true }),
   ]);
+
+  // A failed read must not look like a consultant with no business.
+  const caseRows = unwrap(caseRes, "your cases");
+  const insurerRows = unwrap(insurerRes, "the insurer list");
 
   const cases = ((caseRows ?? []) as unknown as CaseJoinRow[]).map((row) => ({
     ...row,

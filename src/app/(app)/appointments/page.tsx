@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { unwrap } from "@/lib/query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export default async function AppointmentsPage() {
   const from = addDays(today, -LOOKBACK_DAYS);
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const res = await supabase
     .from("appointment_activities")
     .select("*")
     .eq("user_id", profile.id)
@@ -31,6 +32,9 @@ export default async function AppointmentsPage() {
     .lte("business_date", today)
     .order("business_date", { ascending: false })
     .order("created_at", { ascending: true });
+
+  // A failed read must not look like an empty history.
+  const data = unwrap(res, "your appointments");
 
   const appointments = (data as AppointmentActivity[]) ?? [];
 

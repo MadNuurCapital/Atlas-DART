@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { unwrap } from "@/lib/query";
 import { TeamBoard } from "@/components/admin/team-board";
 import { Button } from "@/components/ui/button";
 import { addDays, formatSgDate, sgToday } from "@/lib/sg-date";
@@ -23,7 +24,10 @@ export default async function AdminDailyPage({
   const businessDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
 
   const supabase = await createClient();
-  const { data } = await supabase.rpc("team_daily", { p_date: businessDate });
+  const res = await supabase.rpc("team_daily", { p_date: businessDate });
+
+  // A failed read must not look like a team that submitted nothing.
+  const data = unwrap(res, "the team's day");
 
   const rows = ((data as TeamDailyRow[]) ?? []).map((r) => ({
     ...r,

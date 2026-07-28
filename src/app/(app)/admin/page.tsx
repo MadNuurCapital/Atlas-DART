@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Download, Target, Users } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
+import { unwrap } from "@/lib/query";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,16 @@ export default async function AdminOverviewPage() {
   const { year, month } = parseBusinessDate(today);
   const supabase = await createClient();
 
-  const [{ data: teamRows }, { data: targets }, { data: compliance }] =
-    await Promise.all([
-      supabase.rpc("team_daily", { p_date: today }),
-      supabase.from("v_target_shortfall").select("*"),
-      supabase.rpc("monthly_compliance", { p_year: year, p_month: month }),
-    ]);
+  const [teamRes, targetsRes, complianceRes] = await Promise.all([
+    supabase.rpc("team_daily", { p_date: today }),
+    supabase.from("v_target_shortfall").select("*"),
+    supabase.rpc("monthly_compliance", { p_year: year, p_month: month }),
+  ]);
+
+  // A failed read must not become a team that has apparently written nothing.
+  const teamRows = unwrap(teamRes, "the team's day");
+  const targets = unwrap(targetsRes, "team targets");
+  const compliance = unwrap(complianceRes, "monthly compliance");
 
   const rows = ((teamRows as TeamDailyRow[]) ?? []).map((r) => ({
     ...r,
@@ -124,8 +129,9 @@ export default async function AdminOverviewPage() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm">
               <Users className="mr-1.5 inline size-4" aria-hidden="true" />
-              {withoutTarget.length} {withoutTarget.length === 1 ? "person has" : "people have"}{" "}
-              no {year} target set:{" "}
+              {withoutTarget.length}{" "}
+              {withoutTarget.length === 1 ? "person has" : "people have"} no{" "}
+              {year} target set:{" "}
               <span className="text-muted-foreground">
                 {withoutTarget.map((t) => t.full_name).join(", ")}
               </span>
@@ -155,7 +161,9 @@ export default async function AdminOverviewPage() {
         </CardHeader>
         <CardContent>
           {worstCompliance.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing to show yet.</p>
+            <p className="text-sm text-muted-foreground">
+              Nothing to show yet.
+            </p>
           ) : (
             <ul className="space-y-2">
               {worstCompliance.map((c) => (

@@ -67,6 +67,7 @@ export TEST_DATABASE_URL="postgresql://dart_test:dart_test@127.0.0.1:5432/dart_t
 | `npm run test:all` | All three of the above |
 | `npm run test:e2e` | Playwright |
 | `npm run db:setup` | Build the local test database |
+| `npm run verify:supabase` | Check a real Supabase project is set up correctly |
 
 ## Test coverage today
 
@@ -95,6 +96,21 @@ Row Level Security is the boundary, not the middleware. Every table has RLS **fo
 Middleware and the server-side role checks in `src/lib/auth.ts` are defence in depth. If all of them were removed, a consultant still could not read another consultant's book.
 
 See [`docs/security.md`](docs/security.md).
+
+## First run
+
+The code is complete and tested, but it has only ever run against a local
+PostgreSQL with a Supabase compatibility shim. After creating your project and
+applying the migrations, check it for real:
+
+```bash
+SUPABASE_DB_URL="postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres" \
+  npm run verify:supabase
+```
+
+It confirms the tables, that RLS is *forced*, that no view is a silent RLS
+bypass, that the signup trigger survived, that Realtime is publishing, and that
+an admin exists — then tells you exactly what to fix if not. Read-only.
 
 ## Still required from the client
 

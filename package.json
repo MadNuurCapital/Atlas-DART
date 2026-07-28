@@ -14,7 +14,8 @@
     "test:all": "npm run test && npm run test:components && npm run test:db",
     "test:e2e": "playwright test",
     "db:setup": "./scripts/test-db.sh",
-    "test:components": "vitest run tests/components"
+    "test:components": "vitest run tests/components",
+    "verify:supabase": "tsx scripts/verify-supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

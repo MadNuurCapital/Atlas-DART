@@ -106,6 +106,19 @@ export type Case = Timestamps & {
   cancelled_at: string | null;
 };
 
+export type PushSubscription = {
+  id: string;
+  user_id: string;
+  /** The browser's push service URL. Unique per installation. */
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  failure_count: number;
+  created_at: string;
+  last_used_at: string | null;
+};
+
 export type ReminderLog = {
   id: string;
   user_id: string;
@@ -295,6 +308,19 @@ export type Database = {
           | "cancelled_at"
         >;
         Update: Partial<Case>;
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: PushSubscription;
+        Insert: InsertOf<
+          PushSubscription,
+          | "id"
+          | "created_at"
+          | "last_used_at"
+          | "failure_count"
+          | "user_agent"
+        >;
+        Update: Partial<PushSubscription>;
         Relationships: [];
       };
       reminder_logs: {

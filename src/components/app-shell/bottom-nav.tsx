@@ -26,7 +26,11 @@ const ITEMS = [
  * bottom of the screen is where a thumb actually reaches. Hidden on desktop,
  * where the sidebar in the app layout takes over.
  */
-export function BottomNav() {
+export function BottomNav({
+  needsSubmission = false,
+}: {
+  needsSubmission?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
@@ -51,7 +55,18 @@ export function BottomNav() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon className="size-5" aria-hidden="true" />
+                <span className="relative">
+                  <Icon className="size-5" aria-hidden="true" />
+                  {/* A red dot on Today until it is submitted. Visible from
+                      every screen, so nobody has to go looking for it. */}
+                  {href === "/today" && needsSubmission && (
+                    <span
+                      data-testid="today-badge"
+                      aria-label="Not submitted yet"
+                      className="absolute -right-1 -top-0.5 size-2.5 rounded-full bg-status-absent ring-2 ring-card"
+                    />
+                  )}
+                </span>
                 <span>{label}</span>
               </Link>
             </li>

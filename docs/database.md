@@ -16,6 +16,15 @@ PostgreSQL via Supabase. Migrations in `supabase/migrations/`, applied in filena
 | `0010_views.sql` | Reporting views and report functions |
 | `0011_rls.sql` | Row Level Security and grants |
 | `0012_seed_insurers.sql` | Singapore insurer seed list |
+| `0013_realtime.sql` | Publication for the live admin dashboard |
+| `0014_push_subscriptions.sql` | Devices subscribed to notifications, with their failure counts |
+| `0015_reminder_types.sql` | Widens `reminder_type` to allow `push_<hour>` |
+| `0016_admin_digest_push.sql` | Adds `admin_digest_push`, so the 6am list logs its notification separately from its email |
+
+Every migration is re-runnable. Applying the whole set to a database that
+already has some of it is a no-op rather than an error - triggers and policies
+are dropped before being recreated, seeds use `ON CONFLICT DO NOTHING`.
+`scripts/test-db.sh` applies the bundle twice on every run so that stays true.
 
 ## Time
 

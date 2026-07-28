@@ -232,22 +232,30 @@ export function DailyForm({
 
         {!readOnly && (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="flex-1"
-              disabled={pending}
-              data-testid="save-draft"
-              onClick={() => run(saveDraft)}
-            >
-              {pending ? (
-                <Loader2 className="animate-spin" aria-hidden="true" />
-              ) : (
-                <Save aria-hidden="true" />
-              )}
-              Save draft
-            </Button>
+            {/*
+              Only before the day has been submitted. Afterwards there is
+              nothing to draft - and tapping it used to set the day back to
+              draft, which restarted the evening's chase, put the person in
+              the 6 AM list to admins and counted the day as missed.
+            */}
+            {!isSubmitted && (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                disabled={pending}
+                data-testid="save-draft"
+                onClick={() => run(saveDraft)}
+              >
+                {pending ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Save aria-hidden="true" />
+                )}
+                Save draft
+              </Button>
+            )}
 
             <Button
               type="button"

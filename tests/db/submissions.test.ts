@@ -49,6 +49,18 @@ async function reload(
   return rows[0]!;
 }
 
+/** reload() deliberately selects only the trigger-owned columns. */
+async function dialsOf(
+  c: Parameters<Parameters<typeof withRollback>[0]>[0],
+  id: string,
+): Promise<number> {
+  const { rows } = await c.query<{ dials: number }>(
+    "select dials from public.daily_submissions where id = $1",
+    [id],
+  );
+  return rows[0]!.dials;
+}
+
 describe("one submission per person per date", () => {
   it("rejects a duplicate for the same date", async () => {
     await withRollback(async (c) => {
@@ -204,6 +216,84 @@ describe("submission timing is owned by the database", () => {
 
       const after = await reload(c, row.id);
       expect(after.revision_count).toBe(3);
+    });
+  });
+});
+
+describe("a submitted day cannot be un-submitted", () => {
+  // The form used to offer "Save draft" after a day was submitted. Everything
+  // downstream keys on status = 'submitted', so one tap restarted the evening's
+  // chase, put the person in the 6 AM list to admins, and counted the day as
+  // missed - with first_submitted_at still sitting in the row proving they had
+  // submitted on time.
+
+  it("refuses to move a submitted day back to draft", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await actAs(c, a.id);
+      const row = await insertToday(c, a.id, "submitted", 10);
+
+      await expectRejection(() =>
+        c.query(
+          "update public.daily_submissions set status = 'draft' where id = $1",
+          [row.id],
+        ),
+      );
+    });
+  });
+
+  it("refuses even when the figures change at the same time", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await actAs(c, a.id);
+      const row = await insertToday(c, a.id, "submitted", 10);
+
+      // No follow-up read: the rejection aborts the transaction, which is
+      // itself the proof that neither the status nor the figures landed.
+      await expectRejection(() =>
+        c.query(
+          `update public.daily_submissions
+              set status = 'draft', dials = 99
+            where id = $1`,
+          [row.id],
+        ),
+      );
+    });
+  });
+
+  it("still lets a draft become submitted", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await actAs(c, a.id);
+      const row = await insertToday(c, a.id, "draft", 10);
+
+      await c.query(
+        "update public.daily_submissions set status = 'submitted' where id = $1",
+        [row.id],
+      );
+
+      const after = await reload(c, row.id);
+      expect(after.status).toBe("submitted");
+      expect(after.first_submitted_at).not.toBeNull();
+      expect(after.revision_count).toBe(0);
+    });
+  });
+
+  it("still lets a draft stay a draft", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await actAs(c, a.id);
+      const row = await insertToday(c, a.id, "draft", 10);
+
+      await c.query(
+        "update public.daily_submissions set dials = 12 where id = $1",
+        [row.id],
+      );
+
+      const after = await reload(c, row.id);
+      expect(after.status).toBe("draft");
+      expect(await dialsOf(c, row.id)).toBe(12);
+      expect(after.first_submitted_at).toBeNull();
     });
   });
 });

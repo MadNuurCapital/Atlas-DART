@@ -47,6 +47,14 @@ const submission: DailySubmission = {
   updated_at: "2026-03-10T10:00:00Z",
 };
 
+/** The same day before it was submitted. */
+const draftSubmission: DailySubmission = {
+  ...submission,
+  status: "draft",
+  first_submitted_at: null,
+  last_submitted_at: null,
+};
+
 beforeEach(() => {
   saveDraft.mockReset().mockResolvedValue({ ok: true, message: "Draft saved." });
   submitDay.mockReset().mockResolvedValue({ ok: true, message: "Submitted." });
@@ -73,6 +81,32 @@ describe("daily form", () => {
     expect(screen.getByLabelText(/Talked To/)).toHaveValue(5);
   });
 
+  it("stops offering Save draft once a day is submitted", () => {
+    // Saving a draft over a submitted day used to un-submit it: the evening's
+    // chase restarted, the person appeared on the 6 AM list to admins, and the
+    // day counted as missed in compliance.
+    render(
+      <DailyForm
+        businessDate="2026-03-10"
+        submission={submission}
+        readOnly={false}
+      />,
+    );
+    expect(screen.queryByTestId("save-draft")).not.toBeInTheDocument();
+    expect(screen.getByTestId("open-submit")).toBeInTheDocument();
+  });
+
+  it("still offers Save draft while the day is only a draft", () => {
+    render(
+      <DailyForm
+        businessDate="2026-03-10"
+        submission={draftSubmission}
+        readOnly={false}
+      />,
+    );
+    expect(screen.getByTestId("save-draft")).toBeInTheDocument();
+  });
+
   it("says Resubmit rather than Submit once a day is submitted", () => {
     render(
       <DailyForm
@@ -89,7 +123,7 @@ describe("daily form", () => {
     render(
       <DailyForm
         businessDate="2026-03-10"
-        submission={submission}
+        submission={draftSubmission}
         readOnly={false}
       />,
     );

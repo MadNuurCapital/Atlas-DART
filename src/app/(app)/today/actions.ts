@@ -70,6 +70,17 @@ async function writeSubmission(
     .eq("business_date", input.businessDate)
     .maybeSingle();
 
+  // A submitted day stays submitted. The database refuses this too, but a
+  // Postgres exception is not a sentence anyone can act on - and the reason it
+  // matters is worth saying out loud, because from the form it looks harmless.
+  if (status === "draft" && existing?.status === "submitted") {
+    return {
+      ok: false,
+      message:
+        "This day is already submitted, so it cannot be saved as a draft. Change the figures and resubmit instead.",
+    };
+  }
+
   const { data: saved, error } = await supabase
     .from("daily_submissions")
     .upsert(

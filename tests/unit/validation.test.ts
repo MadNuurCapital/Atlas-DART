@@ -5,6 +5,7 @@ import {
   caseSchema,
   cancelCaseSchema,
   insurerSchema,
+  sameInsurerName,
   fieldErrors,
 } from "@/lib/validation";
 import { sgToday, addDays } from "@/lib/sg-date";
@@ -222,6 +223,28 @@ describe("insurer validation", () => {
   it("trims surrounding whitespace", () => {
     const result = insurerSchema.safeParse({ name: "  AIA Singapore  " });
     expect(result.success && result.data.name).toBe("AIA Singapore");
+  });
+
+  describe("matching an existing insurer", () => {
+    it("treats case and surrounding space as the same name", () => {
+      // Exactly what the unique index on lower(btrim(name)) considers equal.
+      expect(sameInsurerName("AIA", "aia")).toBe(true);
+      expect(sameInsurerName("  AIA  ", "AIA")).toBe(true);
+    });
+
+    it("does not treat a wildcard character as a match", () => {
+      // The duplicate lookup uses ilike, where %, _ and * are wildcards. If a
+      // loose match were trusted, a case would be filed under an insurer the
+      // consultant never chose.
+      expect(sameInsurerName("AIAxLife", "AIA_Life")).toBe(false);
+      expect(sameInsurerName("AIA Singapore", "AIA%")).toBe(false);
+      expect(sameInsurerName("Great Eastern", "Great*")).toBe(false);
+    });
+
+    it("keeps genuinely different insurers apart", () => {
+      expect(sameInsurerName("AIA", "AIA Singapore")).toBe(false);
+      expect(sameInsurerName("Singlife", "Sunlife")).toBe(false);
+    });
   });
 });
 

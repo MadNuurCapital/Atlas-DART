@@ -118,6 +118,19 @@ export const insurerSchema = z.object({
     .max(120, "That name is too long"),
 });
 
+/**
+ * The same comparison the unique index on `insurers` makes: `lower(btrim(name))`.
+ *
+ * Kept deliberately identical to the database. When an inline add collides
+ * with an existing insurer we look the existing one up with ilike - which
+ * treats %, _ and * as wildcards - so the match has to be confirmed before its
+ * id is handed back. Filing a case under the wrong insurer is a great deal
+ * worse than asking someone to retype a name.
+ */
+export function sameInsurerName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export const inviteUserSchema = z.object({
   fullName: z
     .string()

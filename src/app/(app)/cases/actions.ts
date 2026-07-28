@@ -9,6 +9,7 @@ import {
   cancelCaseSchema,
   insurerSchema,
   fieldErrors,
+  sameInsurerName,
   type CaseInput,
 } from "@/lib/validation";
 import type { Case } from "@/types/database";
@@ -268,7 +269,11 @@ export async function createInsurer(
       .ilike("name", parsed.data.name)
       .maybeSingle();
 
-    if (existing) {
+    // ilike treats %, _ and * as wildcards, so a name containing one could
+    // match a DIFFERENT insurer - and silently filing a case under the wrong
+    // one is worse than making someone retype the name. Confirm the match is
+    // genuine before handing its id back.
+    if (existing && sameInsurerName(existing.name, parsed.data.name)) {
       return {
         ok: true,
         insurerId: existing.id,

@@ -4,16 +4,52 @@ import {
   adminDigestEmail,
   alreadySent,
   authoriseManualRun,
+  emailConfigured,
   findAdmins,
   findMissing,
   logReminder,
   sendEmail,
   sgToday,
   summarise,
+  type MissingPerson,
   type SendOutcome,
 } from "./lib/reminders.mts";
+import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
 const REMINDER_TYPE = "admin_digest";
+const PUSH_REMINDER_TYPE = "admin_digest_push";
+
+/**
+ * What the 6 AM notification says.
+ *
+ * Short, because it is read on a lock screen. Names rather than a count alone,
+ * because "three people" sends an admin into the app to find out who, and the
+ * whole point of the digest is that they should not have to.
+ */
+function digestPush(missing: MissingPerson[], businessDate: string) {
+  if (missing.length === 0) {
+    return {
+      title: "Everyone submitted yesterday",
+      body: "Nothing to chase this morning.",
+      silent: true,
+      requireInteraction: false,
+    };
+  }
+
+  const names = missing.map((m) => m.full_name.split(" ")[0] ?? m.full_name);
+  const shown = names.slice(0, 5).join(", ");
+  const rest = names.length > 5 ? ` and ${names.length - 5} more` : "";
+
+  return {
+    title:
+      missing.length === 1
+        ? `1 person missed the DART for ${businessDate}`
+        : `${missing.length} people missed the DART for ${businessDate}`,
+    body: `${shown}${rest}.`,
+    silent: false,
+    requireInteraction: true,
+  };
+}
 
 /** Yesterday, in the Singapore calendar. */
 function previousDay(date: string): string {
@@ -66,6 +102,85 @@ export default async function handler(request: Request) {
       missing.length,
       admins.length,
     );
+
+    // --- The notification, which is the channel that actually works today ---
+    //
+    // Email needs a verified sending domain and there is not one yet. Push
+    // needs nothing but the VAPID keys, so this is what an admin will really
+    // wake up to. It runs first and independently: a Resend outage must not
+    // stop the morning list from arriving.
+    const pushSummary = { sent: 0, failed: 0, removed: 0, skipped: 0 };
+
+    if (!dryRun && process.env.VAPID_PRIVATE_KEY) {
+      configureVapid();
+
+      const appUrl = process.env.APP_URL ?? "";
+      const notification = digestPush(missing, businessDate);
+      const devicesByAdmin = await loadDevices(
+        supabase,
+        admins.map((a) => a.user_id),
+      );
+
+      for (const admin of admins) {
+        const devices = devicesByAdmin.get(admin.user_id) ?? [];
+        if (devices.length === 0) {
+          pushSummary.skipped += 1;
+          continue;
+        }
+
+        if (
+          await alreadySent(
+            supabase,
+            admin.user_id,
+            businessDate,
+            PUSH_REMINDER_TYPE,
+          )
+        ) {
+          pushSummary.skipped += 1;
+          continue;
+        }
+
+        const result = await deliver(supabase, devices, {
+          ...notification,
+          tag: "dart-admin-digest",
+          url: appUrl
+            ? `${appUrl}/admin/daily?date=${businessDate}`
+            : `/admin/daily?date=${businessDate}`,
+        });
+
+        pushSummary.sent += result.sent;
+        pushSummary.failed += result.failed;
+        pushSummary.removed += result.removed;
+
+        await logReminder(supabase, {
+          userId: admin.user_id,
+          businessDate,
+          reminderType: PUSH_REMINDER_TYPE,
+          status: result.delivered ? "sent" : "failed",
+          errorMessage: result.delivered
+            ? undefined
+            : (result.error ?? "no device accepted the notification"),
+        });
+      }
+
+      console.log("[reminder-admin-digest] push %o", pushSummary);
+    }
+
+    // --- The email, if a sender has been configured ---
+
+    if (!emailConfigured()) {
+      console.log(
+        "[reminder-admin-digest] no Resend sender configured; the notification above is the digest.",
+      );
+      return Response.json({
+        businessDate,
+        dryRun,
+        missingCount: missing.length,
+        missing: missing.map((m) => m.full_name),
+        push: pushSummary,
+        email: "not configured",
+      });
+    }
 
     const message = adminDigestEmail(missing, businessDate);
     const outcomes: SendOutcome[] = [];
@@ -123,6 +238,7 @@ export default async function handler(request: Request) {
       dryRun,
       missingCount: missing.length,
       missing: missing.map((m) => m.full_name),
+      push: pushSummary,
       ...summary,
     });
   } catch (error) {

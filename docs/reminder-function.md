@@ -5,8 +5,17 @@ Three Netlify Scheduled Functions.
 | Function | Cron (UTC) | Singapore | What it does |
 |---|---|---|---|
 | `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | Chases anyone still missing |
-| `reminder-consultants` | `0 13 * * *` | 21:00 | One email (needs a Resend domain) |
-| `reminder-admin-digest` | `0 22 * * *` | 06:00 | Emails admins yesterday's missing list |
+| `reminder-consultants` | `0 13 * * *` | 21:00 | One email — **skips itself entirely** until a Resend sender exists |
+| `reminder-admin-digest` | `0 22 * * *` | 06:00 | Notifies admins of yesterday's missing list, and emails it too if Resend is set up |
+
+**Nothing here needs a domain.** Push notifications need only the VAPID keys,
+so both the hourly chase and the 6am admin list work as-is. Email is the
+optional extra on top.
+
+`reminder-consultants` returns early when `RESEND_API_KEY` or
+`REMINDER_FROM_EMAIL` is unset, rather than attempting a send it knows will
+fail. Otherwise it would write one fabricated `failed` row per person per day,
+which buries real failures and marks the day as already attempted.
 
 ## The hourly chase
 
@@ -50,6 +59,21 @@ sent at the deadline names people who then submit at 1am — and an admin who ha
 been told someone missed will remember that whatever the record says afterwards.
 
 At 6am the overnight chase has finished and the list can no longer change.
+
+The digest reaches an admin two ways, logged separately because they succeed
+and fail independently:
+
+| Channel | `reminder_type` | Needs |
+|---|---|---|
+| Notification | `admin_digest_push` | VAPID keys, and the admin has enabled notifications |
+| Email | `admin_digest` | A verified Resend sender |
+
+The notification names up to five people rather than only counting them —
+"three people" just sends an admin into the app to find out who, which is the
+work the digest exists to save. It opens `/admin/daily` for that date.
+
+When nobody is missing the notification is silent: "everyone submitted" is
+worth knowing, but not worth a sound at 6am.
 
 Cron expressions in `netlify.toml` and in `export const config` are always UTC. Singapore is UTC+8 year-round with no daylight saving, so the conversion is fixed.
 

@@ -146,6 +146,19 @@ export async function logReminder(
   }
 }
 
+/**
+ * Whether email is set up at all.
+ *
+ * Reminders reach the team by push notification, which needs no domain. Email
+ * is the optional extra, and until a Resend sender is verified there is
+ * nothing to send with. Checking up front means the scheduled runs exit
+ * quietly instead of writing one fabricated failure row per person per day -
+ * which would both bury real failures and mark the day as already attempted.
+ */
+export function emailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY && process.env.REMINDER_FROM_EMAIL);
+}
+
 /** Send one email through Resend. Returns the error text rather than throwing. */
 export async function sendEmail(opts: {
   to: string;

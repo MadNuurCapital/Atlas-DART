@@ -230,6 +230,33 @@ describe("hourly push nag logging", () => {
       expect(rows).toHaveLength(2);
     });
   });
+
+  it("records the admin's morning notification separately from their email", async () => {
+    // The two channels succeed and fail independently. Sharing one row would
+    // let a delivered notification be recorded as failed simply because Resend
+    // was not configured.
+    await withRollback(async (c) => {
+      const a = await seedUser(c, { role: "admin" });
+      const today = await sgToday(c);
+      await asOwner(c);
+
+      await c.query(
+        `insert into public.reminder_logs
+           (user_id, business_date, reminder_type, status, error_message)
+         values ($1, $2, 'admin_digest_push', 'sent', null),
+                ($1, $2, 'admin_digest', 'failed', 'no Resend sender configured')`,
+        [a.id, today],
+      );
+
+      const { rows } = await c.query(
+        "select reminder_type, status from public.reminder_logs order by reminder_type",
+      );
+      expect(rows).toEqual([
+        { reminder_type: "admin_digest", status: "failed" },
+        { reminder_type: "admin_digest_push", status: "sent" },
+      ]);
+    });
+  });
 });
 
 describe("giving up on a dead device", () => {

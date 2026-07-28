@@ -1,12 +1,11 @@
 import type { Config } from "@netlify/functions";
-import webpush from "web-push";
 import {
   adminClient,
   authoriseManualRun,
   findMissing,
   sgToday,
-  requireEnv,
 } from "./lib/reminders.mts";
+import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
 /**
  * The hourly chase.
@@ -113,15 +112,8 @@ export default async function handler(request: Request) {
   );
 
   try {
-    const publicKey = requireEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
-    const privateKey = requireEnv("VAPID_PRIVATE_KEY");
+    configureVapid();
     const appUrl = process.env.APP_URL ?? "";
-
-    webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",
-      publicKey,
-      privateKey,
-    );
 
     const supabase = adminClient();
     const missing = await findMissing(supabase, businessDate);
@@ -131,23 +123,10 @@ export default async function handler(request: Request) {
       return Response.json({ businessDate, hour, level, missing: 0, sent: 0 });
     }
 
-    // One query for every live subscription belonging to anyone missing,
-    // rather than a query per person.
-    const { data: subs } = await supabase
-      .from("push_subscriptions")
-      .select("id, user_id, endpoint, p256dh, auth, failure_count")
-      .in(
-        "user_id",
-        missing.map((m) => m.user_id),
-      )
-      .lt("failure_count", 5);
-
-    const byUser = new Map<string, NonNullable<typeof subs>>();
-    for (const sub of subs ?? []) {
-      const list = byUser.get(sub.user_id) ?? [];
-      list.push(sub);
-      byUser.set(sub.user_id, list);
-    }
+    const byUser = await loadDevices(
+      supabase,
+      missing.map((m) => m.user_id),
+    );
 
     let sent = 0;
     let failed = 0;
@@ -178,76 +157,28 @@ export default async function handler(request: Request) {
 
       const firstName = person.full_name.split(" ")[0] ?? person.full_name;
       const message = copyFor(level, firstName);
-      let deliveredToAny = false;
-      let lastError: string | undefined;
 
-      for (const device of devices) {
-        try {
-          await webpush.sendNotification(
-            {
-              endpoint: device.endpoint,
-              keys: { p256dh: device.p256dh, auth: device.auth },
-            },
-            JSON.stringify({
-              ...message,
-              tag: "dart-daily-reminder",
-              url: appUrl
-                ? `${appUrl}/today?date=${businessDate}`
-                : `/today?date=${businessDate}`,
-            }),
-            { TTL: 3600 },
-          );
-          deliveredToAny = true;
-          sent += 1;
+      const result = await deliver(supabase, devices, {
+        ...message,
+        tag: "dart-daily-reminder",
+        url: appUrl
+          ? `${appUrl}/today?date=${businessDate}`
+          : `/today?date=${businessDate}`,
+      });
 
-          // Clear any accumulated failures. Without this a device that had a
-          // few transient errors over previous days would eventually cross the
-          // threshold and go silent despite working perfectly.
-          if (device.failure_count > 0) {
-            await supabase
-              .from("push_subscriptions")
-              .update({ failure_count: 0, last_used_at: new Date().toISOString() })
-              .eq("id", device.id);
-          } else {
-            await supabase
-              .from("push_subscriptions")
-              .update({ last_used_at: new Date().toISOString() })
-              .eq("id", device.id);
-          }
-        } catch (error) {
-          const status = (error as { statusCode?: number }).statusCode;
-          lastError = error instanceof Error ? error.message : String(error);
-
-          if (status === 404 || status === 410) {
-            // The browser threw this subscription away. It will never work
-            // again, so delete it rather than retrying every hour forever.
-            await supabase
-              .from("push_subscriptions")
-              .delete()
-              .eq("id", device.id);
-            removed += 1;
-          } else {
-            // INCREMENT, not set. Setting it to 1 each time meant it never
-            // reached the threshold, so a permanently broken endpoint was
-            // retried every hour forever and the give-up logic never ran.
-            await supabase
-              .from("push_subscriptions")
-              .update({ failure_count: device.failure_count + 1 })
-              .eq("id", device.id);
-            failed += 1;
-          }
-        }
-      }
+      sent += result.sent;
+      failed += result.failed;
+      removed += result.removed;
 
       await supabase.from("reminder_logs").upsert(
         {
           user_id: person.user_id,
           business_date: businessDate,
           reminder_type: reminderType,
-          status: deliveredToAny ? "sent" : "failed",
-          error_message: deliveredToAny
+          status: result.delivered ? "sent" : "failed",
+          error_message: result.delivered
             ? null
-            : (lastError ?? "no device accepted the notification"),
+            : (result.error ?? "no device accepted the notification"),
           sent_at: new Date().toISOString(),
         },
         { onConflict: "user_id,business_date,reminder_type" },

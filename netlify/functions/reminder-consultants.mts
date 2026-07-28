@@ -4,6 +4,7 @@ import {
   alreadySent,
   authoriseManualRun,
   consultantEmail,
+  emailConfigured,
   findMissing,
   logReminder,
   sendEmail,
@@ -45,6 +46,18 @@ export default async function handler(request: Request) {
     businessDate,
     dryRun,
   );
+
+  if (!emailConfigured()) {
+    console.log(
+      "[reminder-consultants] skipped: no Resend sender configured. Push notifications are handling reminders.",
+    );
+    return Response.json({
+      businessDate,
+      skipped: "email not configured",
+      sent: 0,
+      failed: 0,
+    });
+  }
 
   try {
     const supabase = adminClient();

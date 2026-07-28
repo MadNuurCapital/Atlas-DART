@@ -58,10 +58,11 @@ The Next.js Runtime v5 is auto-detected. Do **not** install `@netlify/plugin-nex
 
 Declared in the function files themselves via `export const config = { schedule }`, not in `netlify.toml` and not as legacy scheduled API routes.
 
-| Function | Cron (UTC) | Singapore |
-|---|---|---|
-| `reminder-consultants` | `0 13 * * *` | 21:00 |
-| `reminder-admin-digest` | `59 15 * * *` | 23:59 |
+| Function | Cron (UTC) | Singapore | Needs |
+|---|---|---|---|
+| `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | VAPID keys |
+| `reminder-consultants` | `0 13 * * *` | 21:00 | Resend — skips itself without it |
+| `reminder-admin-digest` | `0 22 * * *` | 06:00 | VAPID keys; Resend optional |
 
 They appear under **Functions** after the first deploy. See [`reminder-function.md`](reminder-function.md) for how to test them before letting the crons run unattended — **Netlify Dev does not fire crons**.
 

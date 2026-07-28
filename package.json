@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "db:setup": "./scripts/test-db.sh",
     "test:components": "vitest run tests/components",
-    "verify:supabase": "tsx scripts/verify-supabase.ts"
+    "verify:supabase": "tsx scripts/verify-supabase.ts",
+    "sql:bundle": "./scripts/bundle-migrations.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

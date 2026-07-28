@@ -47,7 +47,7 @@ export async function gatherExportData(opts: {
     scoped(
       supabase
         .from("v_daily_consultant_summary")
-        .select("*")
+        .select("*", { count: "exact" })
         .gte("business_date", start)
         .lte("business_date", end)
         .order("business_date", { ascending: true }),
@@ -56,7 +56,7 @@ export async function gatherExportData(opts: {
     scoped(
       supabase
         .from("appointment_activities")
-        .select("*, profiles ( full_name )")
+        .select("*, profiles ( full_name )", { count: "exact" })
         .gte("business_date", start)
         .lte("business_date", end)
         .order("business_date", { ascending: true }),
@@ -67,6 +67,7 @@ export async function gatherExportData(opts: {
         .from("cases")
         .select(
           "*, insurers ( name ), profiles!cases_consultant_id_fkey ( full_name )",
+          { count: "exact" },
         )
         .gte("date_submitted", start)
         .lte("date_submitted", end)
@@ -85,6 +86,44 @@ export async function gatherExportData(opts: {
     ),
     supabase.from("profiles").select("id, full_name"),
   ]);
+
+  // A failed read must not become an empty sheet.
+  //
+  // Every query below used to end in `?? []`, so a permission problem, a
+  // renamed column or a dropped connection produced a workbook that opened
+  // perfectly and under-reported the month. That is the worst possible
+  // failure for the one document the monthly meeting runs on: nobody
+  // double-checks a report that looks fine. Refusing to build it at all sends
+  // the admin a 500 they will ask about.
+  for (const [what, result] of [
+    ["the daily summary", dailyRes],
+    ["appointments", apptRes],
+    ["cases", caseRes],
+    ["targets", targetRes],
+    ["compliance", complianceRes],
+    ["the category mix", mixRes],
+    ["consultant names", profileRes],
+  ] as const) {
+    if (result.error) {
+      throw new Error(`Export could not read ${what}: ${result.error.message}`);
+    }
+  }
+
+  // PostgREST can be configured with a maximum row count, and a truncated
+  // export is the same silent under-reporting by another route. The count
+  // comes from the same request, so this costs nothing extra.
+  for (const [what, result] of [
+    ["daily submissions", dailyRes],
+    ["appointments", apptRes],
+    ["cases", caseRes],
+  ] as const) {
+    const returned = result.data?.length ?? 0;
+    if (typeof result.count === "number" && result.count > returned) {
+      throw new Error(
+        `Export read only ${returned} of ${result.count} ${what}. Refusing to build a partial report.`,
+      );
+    }
+  }
 
   const names = new Map(
     ((profileRes.data as { id: string; full_name: string }[]) ?? []).map((p) => [

@@ -112,6 +112,9 @@ It confirms the tables, that RLS is *forced*, that no view is a silent RLS
 bypass, that the signup trigger survived, that Realtime is publishing, and that
 an admin exists — then tells you exactly what to fix if not. Read-only.
 
+No local tooling to hand? `supabase/health-check.sql` runs the same checks as a
+single query you can paste into the Supabase SQL editor.
+
 ## Still required from the client
 
 - Exact brand hex codes, or the logo file. Current values in `src/app/globals.css` are estimated from the supplied image; all colour is defined in that one file.

@@ -123,3 +123,56 @@ describe("the bundle scanner actually detects a leak", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * The VAPID private key signs push notifications. In the browser it would let
+ * anyone send a notification that appears to come from this app.
+ *
+ * The public half is deliberately NEXT_PUBLIC_ - it has to reach the browser to
+ * subscribe a device. That similarity is exactly the hazard: prefixing the
+ * private key the same way by accident would publish it, and nothing about the
+ * app would visibly break.
+ */
+describe("the VAPID private key cannot reach the browser", () => {
+  const sourceFiles = walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f));
+
+  it("is only read by server-only modules", () => {
+    // The Netlify functions sign notifications on a schedule and are never
+    // bundled for the browser. Inside src/ exactly one module signs anything -
+    // the "send a test notification" path - and it must say so out loud, since
+    // "server-only" is what turns a client import of it into a build failure
+    // rather than a published private key.
+    const offenders = sourceFiles
+      .filter((f) => {
+        const content = readFileSync(f, "utf8");
+        if (!content.includes("VAPID_PRIVATE_KEY")) return false;
+        return !/import\s+["']server-only["']/.test(content);
+      })
+      .map((f) => relative(ROOT, f));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("was never given a NEXT_PUBLIC_ prefix", () => {
+    const offenders = [
+      ...sourceFiles,
+      ...walk(join(ROOT, "netlify")).filter((f) => /\.(ts|mts)$/.test(f)),
+    ].filter((f) =>
+      /NEXT_PUBLIC_VAPID_PRIVATE/.test(readFileSync(f, "utf8")),
+    );
+
+    expect(offenders.map((f) => relative(ROOT, f))).toEqual([]);
+  });
+
+  it("is absent from any built client bundle", () => {
+    const staticDir = join(ROOT, ".next", "static");
+    if (!existsSync(staticDir)) return;
+
+    const leaked = walk(staticDir)
+      .filter((f) => f.endsWith(".js"))
+      .filter((f) => readFileSync(f, "utf8").includes("VAPID_PRIVATE_KEY"))
+      .map((f) => relative(ROOT, f));
+
+    expect(leaked).toEqual([]);
+  });
+});

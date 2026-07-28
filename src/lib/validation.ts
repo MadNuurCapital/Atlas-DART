@@ -118,6 +118,23 @@ export const insurerSchema = z.object({
     .max(120, "That name is too long"),
 });
 
+export const inviteUserSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(2, "Enter their full name")
+    .max(120, "That name is too long"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, "Enter their email")
+    .email("That does not look like an email address"),
+  role: z.enum(["consultant", "admin"], { message: "Choose a role" }),
+});
+
+export type InviteUserInput = z.infer<typeof inviteUserSchema>;
+
 export const targetSchema = z.object({
   consultantId: z.string().uuid(),
   year: z.number().int().min(2000).max(2200),

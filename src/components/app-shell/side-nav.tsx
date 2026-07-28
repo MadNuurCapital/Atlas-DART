@@ -13,6 +13,8 @@ import {
   Target,
   Download,
   Building2,
+  UserCog,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
@@ -30,8 +32,10 @@ const ADMIN_ITEMS = [
   { href: "/admin/daily", label: "Daily board", icon: Table2 },
   { href: "/admin/cases", label: "All cases", icon: Briefcase },
   { href: "/admin/targets", label: "Targets", icon: Target },
+  { href: "/admin/users", label: "People", icon: UserCog },
   { href: "/admin/insurers", label: "Insurers", icon: Building2 },
   { href: "/admin/export", label: "Export", icon: Download },
+  { href: "/admin/audit", label: "Audit trail", icon: ScrollText },
 ] as const;
 
 /** Desktop sidebar. The mobile equivalent is BottomNav. */

@@ -21,7 +21,7 @@ Replaces the per-consultant `Consultant_XXX.numbers` workbooks.
 | 5 | Six-sheet Excel export | **Done** |
 | 6 | Reminders, audit logging, docs | **Done** |
 
-Not yet built, and deliberately: the `/admin/users` invite screen agreed after Phase 1. It needs a live Supabase project to be worth testing.
+Also built: `/admin/users` for inviting people and managing leavers, and `/admin/audit` so the audit trail can actually be read.
 
 ## Stack
 
@@ -62,17 +62,19 @@ export TEST_DATABASE_URL="postgresql://dart_test:dart_test@127.0.0.1:5432/dart_t
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Unit tests (pure logic, no database) |
+| `npm run test:components` | Component tests under jsdom |
 | `npm run test:db` | Row Level Security suite against real Postgres |
-| `npm run test:all` | Both of the above |
+| `npm run test:all` | All three of the above |
 | `npm run test:e2e` | Playwright |
 | `npm run db:setup` | Build the local test database |
 
 ## Test coverage today
 
-**199 tests, all passing.**
+**239 tests, all passing.**
 
-- **112 unit** — Singapore date handling including the UTC-midnight boundary, deadline and on-time derivation, target and shortfall arithmetic, compliance percentages, all validation schemas, the Excel workbook (cell *types*, not just values), reminder scheduling and email content, and a guard proving the service-role key cannot reach the browser.
-- **73 database** — the Row Level Security matrix executed against real PostgreSQL 16: cross-consultant isolation, privilege escalation, the 7-day edit window, deletion being impossible, submission-timing triggers, cancellation and restoration, insurer de-duplication, target history, reminder idempotency, and the Realtime publication.
+- **110 unit** — Singapore date handling including the UTC-midnight boundary, deadline and on-time derivation, target and shortfall arithmetic, compliance percentages, all validation schemas, the Excel workbook (cell *types*, not just values), reminder scheduling and email content, and a guard proving the service-role key cannot reach the browser.
+- **32 component** — the daily form and case list under a real DOM: double-tap sends one request, the confirmation shows live values rather than stale ones, a locked day rejects input, cancelling demands a reason, and the audit diff shows only what moved.
+- **83 database** — the Row Level Security matrix executed against real PostgreSQL 16: cross-consultant isolation, privilege escalation, the 7-day edit window, deletion being impossible, submission-timing triggers, cancellation and restoration, insurer de-duplication, target history, reminder idempotency, account management, and the Realtime publication.
 - **14 end-to-end** — authentication and access control on mobile and desktop viewports.
 
 ## Key decisions

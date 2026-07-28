@@ -77,7 +77,29 @@ export const AUDIT_ACTIONS = [
   "insurer_created",
   "insurer_updated",
   "admin_override_submission",
+  "user_invited",
+  "user_role_changed",
+  "user_deactivated",
+  "user_reactivated",
 ] as const;
+
+/** Plain-English descriptions for the audit trail screen. */
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  daily_submission_created: "Submitted a day",
+  daily_submission_resubmitted: "Resubmitted a day",
+  case_created: "Added a case",
+  case_updated: "Edited a case",
+  case_cancelled: "Cancelled a case",
+  case_restored: "Restored a case",
+  target_changed: "Changed a target",
+  insurer_created: "Added an insurer",
+  insurer_updated: "Changed an insurer",
+  admin_override_submission: "Edited someone else's day",
+  user_invited: "Invited someone",
+  user_role_changed: "Changed a role",
+  user_deactivated: "Deactivated an account",
+  user_reactivated: "Reactivated an account",
+};
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 /** Submission deadline, Singapore time. Displayed on the daily form. */

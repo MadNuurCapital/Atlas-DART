@@ -488,3 +488,160 @@ describe("realtime publication", () => {
     });
   });
 });
+
+describe("account management", () => {
+  it("lets an admin change someone's role", async () => {
+    await withRollback(async (c) => {
+      const admin = await seedUser(c, { role: "admin" });
+      const b = await seedUser(c);
+
+      await actAs(c, admin.id);
+      await c.query("update public.profiles set role = 'admin' where id = $1", [
+        b.id,
+      ]);
+
+      const { rows } = await c.query<{ role: string }>(
+        "select role from public.profiles where id = $1",
+        [b.id],
+      );
+      expect(rows[0]!.role).toBe("admin");
+    });
+  });
+
+  it("lets an admin deactivate a leaver without touching their history", async () => {
+    await withRollback(async (c) => {
+      const admin = await seedUser(c, { role: "admin" });
+      const leaver = await seedUser(c);
+      const insurer = await seedInsurer(c);
+      const today = await sgToday(c);
+
+      await seedSubmission(c, leaver.id, today);
+      await seedCase(c, leaver.id, insurer, {
+        dateSubmitted: "2026-03-10",
+        gr: 5000,
+      });
+
+      await actAs(c, admin.id);
+      await c.query(
+        "update public.profiles set active = false where id = $1",
+        [leaver.id],
+      );
+
+      // Their GR is still there, in the month it was earned.
+      const { rows } = await c.query<{ active_gr: string }>(
+        `select active_gr from public.v_monthly_consultant_gr
+          where consultant_id = $1 and year = 2026 and month = 3`,
+        [leaver.id],
+      );
+      expect(Number(rows[0]!.active_gr)).toBe(5000);
+
+      // But they are no longer chased.
+      const missing = await c.query<{ user_id: string }>(
+        "select user_id from public.missing_submissions(null)",
+      );
+      expect(missing.rows.map((r) => r.user_id)).not.toContain(leaver.id);
+    });
+  });
+
+  it("stops a consultant reading anyone else's profile", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      await seedUser(c);
+      await seedUser(c, { role: "admin" });
+
+      await actAs(c, a.id);
+      const { rows } = await c.query<{ id: string }>(
+        "select id from public.profiles",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.id).toBe(a.id);
+    });
+  });
+
+  it("lets an admin see everyone, including deactivated accounts", async () => {
+    await withRollback(async (c) => {
+      const admin = await seedUser(c, { role: "admin" });
+      const b = await seedUser(c);
+      await asOwner(c);
+      await c.query("update public.profiles set active = false where id = $1", [
+        b.id,
+      ]);
+
+      await actAs(c, admin.id);
+      const { rows } = await c.query("select id from public.profiles");
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("stops a deactivated admin from acting as an admin", async () => {
+    await withRollback(async (c) => {
+      const admin = await seedUser(c, { role: "admin" });
+      const b = await seedUser(c);
+      await asOwner(c);
+      await c.query("update public.profiles set active = false where id = $1", [
+        admin.id,
+      ]);
+
+      // is_admin() requires the profile to be active, so a deactivated admin
+      // loses their powers rather than keeping them until someone notices.
+      await actAs(c, admin.id);
+      const { rows } = await c.query("select id from public.profiles");
+      expect(rows.map((r) => (r as { id: string }).id)).not.toContain(b.id);
+    });
+  });
+});
+
+describe("the audit trail is readable but not writable", () => {
+  it("lets an admin read every entry", async () => {
+    await withRollback(async (c) => {
+      const admin = await seedUser(c, { role: "admin" });
+      const b = await seedUser(c);
+      await asOwner(c);
+      await c.query(
+        `insert into public.audit_logs (actor_user_id, action, entity_type)
+         values ($1, 'case_created', 'cases'), ($2, 'target_changed', 'consultant_targets')`,
+        [admin.id, b.id],
+      );
+
+      await actAs(c, admin.id);
+      const { rows } = await c.query("select * from public.audit_logs");
+      expect(rows).toHaveLength(2);
+    });
+  });
+
+  it("shows a consultant only their own entries", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      const b = await seedUser(c);
+      await asOwner(c);
+      await c.query(
+        `insert into public.audit_logs (actor_user_id, action, entity_type)
+         values ($1, 'case_created', 'cases'), ($2, 'case_created', 'cases')`,
+        [a.id, b.id],
+      );
+
+      await actAs(c, a.id);
+      const { rows } = await c.query<{ actor_user_id: string }>(
+        "select actor_user_id from public.audit_logs",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.actor_user_id).toBe(a.id);
+    });
+  });
+
+  it("stops anyone attributing an action to someone else", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      const b = await seedUser(c);
+
+      await actAs(c, a.id);
+      await expectRejection(() =>
+        c.query(
+          `insert into public.audit_logs (actor_user_id, action, entity_type)
+           values ($1, 'case_cancelled', 'cases')`,
+          [b.id],
+        ),
+      );
+    });
+  });
+});

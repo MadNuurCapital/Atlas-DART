@@ -11,9 +11,10 @@
     "test": "vitest run tests/unit",
     "test:watch": "vitest tests/unit",
     "test:db": "vitest run tests/db",
-    "test:all": "npm run test && npm run test:db",
+    "test:all": "npm run test && npm run test:components && npm run test:db",
     "test:e2e": "playwright test",
-    "db:setup": "./scripts/test-db.sh"
+    "db:setup": "./scripts/test-db.sh",
+    "test:components": "vitest run tests/components"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
@@ -50,6 +51,7 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",

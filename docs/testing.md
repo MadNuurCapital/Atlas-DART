@@ -1,11 +1,12 @@
 # Testing
 
-**121 tests today, all passing.** Three suites with different jobs.
+**239 tests today, all passing.** Four suites with different jobs.
 
 | Suite | Count | Command | Needs |
 |---|---|---|---|
-| Unit | 46 | `npm test` | nothing |
-| Database / RLS | 61 | `npm run test:db` | PostgreSQL 16 |
+| Unit | 110 | `npm test` | nothing |
+| Component | 32 | `npm run test:components` | jsdom |
+| Database / RLS | 83 | `npm run test:db` | PostgreSQL 16 |
 | End-to-end | 14 | `npm run test:e2e` | a build + Chromium |
 
 ## Unit — `tests/unit/`
@@ -13,6 +14,20 @@
 Pure logic, no I/O. Singapore date conversion including the UTC-midnight boundary, deadline and on-time derivation, target resolution and shortfall arithmetic, compliance percentages, currency formatting, and the guard proving the service-role key cannot reach the browser.
 
 These are the tests most likely to catch a real bug: one of them found an off-by-999ms error in the timezone offset calculation that would have mismarked submissions made in the final second before the deadline.
+
+## Component — `tests/components/`
+
+React Testing Library against a real DOM. Server actions are mocked — what they
+do is covered by the database suite; what is under test here is the component.
+
+These target the behaviours that would quietly cost someone their compliance:
+a double-tap sending two submissions, the confirmation dialog showing stale
+numbers because it renders in a portal outside the form, a locked day still
+accepting input, cancelling a case without demanding a reason, and the audit
+diff listing fields that did not actually change.
+
+Each file opts into jsdom with a `@vitest-environment jsdom` docblock. Booting
+jsdom for the date and SQL suites would cost time for nothing.
 
 ## Database — `tests/db/`
 
@@ -76,5 +91,6 @@ npm run lint && npm run typecheck && npm run test:all
 ## Known gaps
 
 - RLS is verified against PostgreSQL 16 with the auth shim, **not yet against the real Supabase project**. Re-run `npm run test:db` against the live database once it exists, and treat that as the real sign-off.
-- No component tests yet; the UI is currently a shell and a login form, both covered end to end.
+- The invite flow in `/admin/users` calls Supabase's Admin API, which has no local equivalent. Its validation, duplicate detection and last-admin guard are covered; **the actual invite call is untested** until there is a project to call. Send one invitation to yourself before inviting the team.
+- Signed-in end-to-end journeys need seeded Supabase accounts. The E2E suite currently covers the unauthenticated paths only.
 - `npm audit` reports advisories in Next's own bundled `postcss` and `sharp`, and in `uuid` beneath `exceljs`. `npm audit fix --force` would downgrade Next to 9.3.3 and exceljs to 3.4.0, so they are knowingly left alone pending upstream releases.

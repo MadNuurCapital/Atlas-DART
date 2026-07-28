@@ -109,6 +109,18 @@ Do this with `dryRun=true` first.
 - [ ] Run it twice — no second email, and `reminder_logs` still has one row per person.
 - [ ] A deactivated leaver receives nothing.
 
+## People and the audit trail
+
+- [ ] Invite someone; they receive an email and can set their own password.
+- [ ] If email is not configured yet, the temporary password is shown **and can be copied** — closing that dialog must not be the only chance to read it.
+- [ ] Inviting an email that already exists is refused, naming who has it.
+- [ ] Promote a consultant to admin; they gain the Management section.
+- [ ] Try to demote or deactivate the **last** active admin — it must be refused.
+- [ ] Deactivate a leaver: they vanish from the team board and reminders, but their past GR and submissions are untouched in reports.
+- [ ] Open `/admin/audit`. Every change you made above appears, with who and when.
+- [ ] A target change shows the old value and the new one, formatted as money.
+- [ ] Filter by action works.
+
 ## Accessibility and field conditions
 
 - [ ] Readable outdoors at full brightness.

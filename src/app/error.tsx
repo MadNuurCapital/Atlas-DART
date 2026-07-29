@@ -109,9 +109,10 @@ export default function Error({
             <summary className="cursor-pointer text-xs text-muted-foreground">
               Technical details
             </summary>
-            <p className="mt-2 break-words rounded-md bg-muted px-2.5 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-2 whitespace-pre-line break-words rounded-md bg-muted px-2.5 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
               {error.name}: {error.message || "no message"}
               {error.digest ? ` (${error.digest})` : ""}
+              {"\n"}build {process.env.NEXT_PUBLIC_BUILD_REF ?? "unknown"}
             </p>
             <p className="mt-1.5 text-xs text-muted-foreground">
               Send this to your administrator if it keeps happening.

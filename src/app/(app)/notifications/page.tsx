@@ -20,10 +20,24 @@ export default async function NotificationsPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  const { data: devices } = await supabase
+  const { data: devices, error } = await supabase
     .from("push_subscriptions")
     .select("id, user_agent, created_at")
     .eq("user_id", profile.id);
+
+  // Deliberately not unwrap(): a missing table here is a setup step nobody has
+  // done yet, not a fault. Throwing would show "something went wrong", which
+  // is the least useful thing to tell the one person who can actually fix it.
+  const tableMissing =
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    /relation .*push_subscriptions.* does not exist|could not find the table/i.test(
+      error?.message ?? "",
+    );
+
+  if (error && !tableMissing) {
+    console.error("[notifications] could not read devices: %s", error.message);
+  }
 
   const count = devices?.length ?? 0;
 
@@ -36,10 +50,31 @@ export default async function NotificationsPage() {
         </p>
       </div>
 
-      <EnablePush
-        vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
-        initiallyEnabled={count > 0}
-      />
+      {tableMissing ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Reminders are not set up yet
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              The place that stores which devices to notify does not exist in
+              the database yet, so notifications cannot be turned on.
+            </p>
+            <p>
+              {profile.role === "admin"
+                ? "Run the push_subscriptions setup in the Supabase SQL editor, then come back to this page."
+                : "Your administrator needs to finish setting this up. Nothing is wrong with your phone."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <EnablePush
+          vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+          initiallyEnabled={count > 0}
+        />
+      )}
 
       <Card>
         <CardHeader className="pb-3">

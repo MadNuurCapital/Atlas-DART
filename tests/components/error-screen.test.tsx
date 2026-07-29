@@ -58,6 +58,14 @@ describe("the error screen", () => {
     expect(screen.getByText(/9fa1c2/)).toBeInTheDocument();
   });
 
+  it("says which build the phone is running", () => {
+    // Without this, "I deployed a fix and it still fails" is unanswerable:
+    // browsers and installed apps hold on to old code far longer than anyone
+    // expects, and that looks identical to the fix not working.
+    render(<ErrorScreen error={fail("Error", "boom")} reset={() => {}} />);
+    expect(screen.getByText(/build /)).toBeInTheDocument();
+  });
+
   it("copes with an error carrying no message at all", () => {
     render(<ErrorScreen error={fail("Error", "")} reset={() => {}} />);
     expect(screen.getByText(/no message/)).toBeInTheDocument();

@@ -53,31 +53,51 @@ function detectSupport(vapidPublicKey: string | null): Support {
     };
   }
 
-  // iOS only allows web push from a site added to the Home Screen. Detect that
-  // rather than letting someone tap a button that silently does nothing.
-  const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    ("standalone" in navigator &&
-      (navigator as unknown as { standalone?: boolean }).standalone === true);
+  // Everything below asks the browser about itself, and this runs inside
+  // getSnapshot - so anything that throws here throws during render, which
+  // takes down the entire page rather than just this card. Browsers disagree
+  // about these APIs in ways that are genuinely hard to predict: matchMedia
+  // and Notification behave differently in a private window, in an embedded
+  // webview, and inside an installed iOS app, and a locked-down device can
+  // make simply reading Notification.permission throw.
+  //
+  // No capability check is worth a broken page. If the browser will not answer
+  // the question, the honest response is that notifications are unavailable
+  // here - which is exactly what "unsupported" says.
+  try {
+    // iOS only allows web push from a site added to the Home Screen. Detect
+    // that rather than letting someone tap a button that silently does nothing.
+    const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
+    const isStandalone =
+      window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+      ("standalone" in navigator &&
+        (navigator as unknown as { standalone?: boolean }).standalone === true);
 
-  if (isIos && !isStandalone) return { kind: "needs-install" };
+    if (isIos && !isStandalone) return { kind: "needs-install" };
 
-  const hasApi =
-    "serviceWorker" in navigator &&
-    "PushManager" in window &&
-    "Notification" in window;
+    const hasApi =
+      "serviceWorker" in navigator &&
+      "PushManager" in window &&
+      "Notification" in window;
 
-  if (!hasApi) {
+    if (!hasApi) {
+      return {
+        kind: "unsupported",
+        reason: "This browser does not support notifications.",
+      };
+    }
+
+    if (Notification.permission === "denied") return { kind: "blocked" };
+
+    return { kind: "ready" };
+  } catch (error) {
+    console.error("[push] could not read notification support", error);
     return {
       kind: "unsupported",
-      reason: "This browser does not support notifications.",
+      reason:
+        "This browser would not say whether it supports notifications, so they cannot be turned on here.",
     };
   }
-
-  if (Notification.permission === "denied") return { kind: "blocked" };
-
-  return { kind: "ready" };
 }
 
 /**

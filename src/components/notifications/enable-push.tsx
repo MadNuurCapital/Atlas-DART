@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { Bell, BellOff, Loader2, Send, Share, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -80,6 +80,17 @@ function detectSupport(vapidPublicKey: string | null): Support {
   return { kind: "ready" };
 }
 
+/**
+ * Browser capability never changes, so there is nothing to subscribe to.
+ *
+ * Hoisted to module scope rather than written inline: a new function on every
+ * render makes React tear down and re-establish the subscription each time.
+ */
+const NEVER_CHANGES = () => () => {};
+
+/** One shared instance, so the server snapshot is referentially stable. */
+const CHECKING: Support = { kind: "checking" };
+
 export function EnablePush({
   vapidPublicKey,
   initiallyEnabled,
@@ -87,13 +98,27 @@ export function EnablePush({
   vapidPublicKey: string | null;
   initiallyEnabled: boolean;
 }) {
-  // "checking" on the server, the real answer on the client. useSyncExternalStore
-  // is the supported way to read a browser-only value without hydration
-  // mismatch and without setting state from an effect.
+  // getSnapshot MUST return the same object every time until the underlying
+  // value actually changes. React compares snapshots by reference to decide
+  // whether the store has settled, so returning a fresh object literal on each
+  // call looks like a store changing infinitely - and React gives up with
+  // "Maximum update depth exceeded", which took the whole page down with it.
+  //
+  // detectSupport() reads the browser, so its answer is fixed for the life of
+  // the page. Computing it once and handing back the same object is both
+  // correct and what React requires.
+  const getSupport = useMemo(() => {
+    let cached: Support | null = null;
+    return () => (cached ??= detectSupport(vapidPublicKey));
+  }, [vapidPublicKey]);
+
+  // "checking" on the server, the real answer on the client.
+  // useSyncExternalStore is the supported way to read a browser-only value
+  // without a hydration mismatch and without setting state from an effect.
   const detected = useSyncExternalStore(
-    () => () => {},
-    () => detectSupport(vapidPublicKey),
-    () => ({ kind: "checking" }) as Support,
+    NEVER_CHANGES,
+    getSupport,
+    () => CHECKING,
   );
 
   // Only ever set from an event handler, e.g. after permission is refused.

@@ -39,7 +39,18 @@ vi.mock("@/lib/supabase/client", () => ({
       },
     }),
     removeChannel: vi.fn(),
+    auth: {
+      setSession: vi.fn().mockResolvedValue({ error: null }),
+      exchangeCodeForSession: vi.fn().mockResolvedValue({ error: null }),
+      verifyOtp: vi.fn().mockResolvedValue({ error: null }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
   }),
+}));
+
+vi.mock("@/app/login/actions", () => ({
+  signIn: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 vi.mock("@/app/(app)/cases/actions", () => ({
@@ -270,6 +281,25 @@ describe("every client component mounts without throwing", () => {
     const { BottomNav } = await import("@/components/app-shell/bottom-nav");
     expect(() => render(<BottomNav />)).not.toThrow();
     expect(() => render(<BottomNav needsSubmission />)).not.toThrow();
+  });
+
+  it("the login form", async () => {
+    const { LoginForm } = await import("@/app/login/login-form");
+    expect(() => render(<LoginForm />)).not.toThrow();
+    expect(() => render(<LoginForm redirectTo="/cases" />)).not.toThrow();
+  });
+
+  it("the side navigation", async () => {
+    const { SideNav } = await import("@/components/app-shell/side-nav");
+    expect(() => render(<SideNav isAdmin={false} />)).not.toThrow();
+    expect(() => render(<SideNav isAdmin />)).not.toThrow();
+  });
+
+  it("the invitation callback handler", async () => {
+    const { CallbackHandler } = await import(
+      "@/app/auth/callback/callback-handler"
+    );
+    expect(() => render(<CallbackHandler />)).not.toThrow();
   });
 
   it("the error screen", async () => {

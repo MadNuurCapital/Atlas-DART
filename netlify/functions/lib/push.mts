@@ -51,12 +51,20 @@ export type DeliveryResult = {
  */
 export const MAX_PUSH_FAILURES = 5;
 
-/** Throws if the VAPID keys are absent, which is the only fatal misconfiguration. */
+/**
+ * Throws if the VAPID keys are absent, which is the only fatal
+ * misconfiguration.
+ *
+ * Keys are trimmed because they are pasted into a hosting dashboard by hand,
+ * where a trailing newline is easy to acquire and impossible to see. Without
+ * this the library rejects the key with a message about its length, which
+ * sends whoever is debugging it looking for the wrong problem entirely.
+ */
 export function configureVapid(): void {
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",
-    requireEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY"),
-    requireEnv("VAPID_PRIVATE_KEY"),
+    (process.env.VAPID_SUBJECT ?? "mailto:admin@example.com").trim(),
+    requireEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY").trim(),
+    requireEnv("VAPID_PRIVATE_KEY").trim(),
   );
 }
 

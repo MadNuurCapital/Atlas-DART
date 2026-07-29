@@ -19,9 +19,16 @@ import { Badge } from "@/components/ui/badge";
  * typed as BufferSource over a plain ArrayBuffer, and a Uint8Array's backing
  * buffer is ArrayBufferLike, which does not satisfy it.
  */
-function urlBase64ToBuffer(base64: string): ArrayBuffer {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const normalised = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+export function urlBase64ToBuffer(base64: string): ArrayBuffer {
+  // Strip whitespace first. This key is typed or pasted into a hosting
+  // dashboard by hand, and a trailing newline or a stray space survives that
+  // journey easily - at which point atob() throws InvalidCharacterError and
+  // the only symptom is "reminders could not be turned on", which points
+  // nowhere near the actual cause.
+  const cleaned = base64.replace(/\s+/g, "");
+
+  const padding = "=".repeat((4 - (cleaned.length % 4)) % 4);
+  const normalised = (cleaned + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(normalised);
   const buffer = new ArrayBuffer(raw.length);
   const view = new Uint8Array(buffer);

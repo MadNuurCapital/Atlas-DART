@@ -37,9 +37,13 @@ let configured = false;
 function configure(): boolean {
   if (configured) return true;
 
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+  // Trimmed: these are pasted into a hosting dashboard by hand, where a
+  // trailing newline is easy to acquire and impossible to see.
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
+  const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
+  const subject = (
+    process.env.VAPID_SUBJECT ?? "mailto:admin@example.com"
+  ).trim();
 
   if (!publicKey || !privateKey) return false;
 

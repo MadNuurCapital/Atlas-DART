@@ -18,6 +18,10 @@ const { EnablePush } = await import("@/components/notifications/enable-push");
 
 const VAPID = "BJ1p_TESTKEYTESTKEYTESTKEYTESTKEYTESTKEY";
 
+/** A genuine VAPID public key: 65 bytes, url-safe base64. */
+const VAPID_REAL =
+  "BLnafqlR4T9P8Va8A-8hNp_-xj9TTzpwlhqhqDBuPIDRBqaqZSidK7ABB9VcM4xbWvxEUjU-nX2nsmXp-vj6xII";
+
 /** Pretend to be a particular browser for the length of one test. */
 function asBrowser(opts: {
   userAgent?: string;
@@ -133,5 +137,39 @@ describe("the reminders card", () => {
 
     expect(screen.getByText("On")).toBeInTheDocument();
     expect(screen.getByTestId("test-push")).toBeInTheDocument();
+  });
+});
+
+describe("decoding the VAPID public key", () => {
+  it("accepts the key exactly as generated", async () => {
+    const { urlBase64ToBuffer } = await import(
+      "@/components/notifications/enable-push"
+    );
+    // A real VAPID public key is 65 bytes: an uncompressed P-256 point.
+    expect(urlBase64ToBuffer(VAPID_REAL).byteLength).toBe(65);
+  });
+
+  it("survives the whitespace a dashboard paste leaves behind", async () => {
+    const { urlBase64ToBuffer } = await import(
+      "@/components/notifications/enable-push"
+    );
+    // Without this the only symptom is "reminders could not be turned on",
+    // which points nowhere near a stray newline in a hosting dashboard.
+    for (const messy of [
+      `${VAPID_REAL}\n`,
+      ` ${VAPID_REAL} `,
+      `${VAPID_REAL}\r\n`,
+    ]) {
+      expect(urlBase64ToBuffer(messy).byteLength).toBe(65);
+    }
+  });
+
+  it("decodes the url-safe alphabet, not just standard base64", async () => {
+    const { urlBase64ToBuffer } = await import(
+      "@/components/notifications/enable-push"
+    );
+    // "-" and "_" stand in for "+" and "/"; treating them literally would
+    // decode to the wrong bytes and the subscription would be rejected.
+    expect(urlBase64ToBuffer("-_8").byteLength).toBe(2);
   });
 });

@@ -52,6 +52,13 @@ export default async function DashboardPage() {
   const today = sgToday();
   const { year, month } = parseBusinessDate(today);
   const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+  const yesterday = addDays(today, -1);
+
+  // Read from whichever is earlier. On the 1st, yesterday belongs to last month
+  // and would fall outside a month-start window - which is why the "yesterday
+  // is not submitted" nudge used to fire for everybody on the 1st of every
+  // month, whether they had submitted or not.
+  const readFrom = yesterday < monthStart ? yesterday : monthStart;
 
   const supabase = await createClient();
 
@@ -67,7 +74,7 @@ export default async function DashboardPage() {
         .from("v_daily_consultant_summary")
         .select("*")
         .eq("user_id", profile.id)
-        .gte("business_date", monthStart)
+        .gte("business_date", readFrom)
         .lte("business_date", today),
       supabase
         .from("v_target_shortfall")
@@ -100,7 +107,11 @@ export default async function DashboardPage() {
   const mixRows = unwrap(mixRes, "the category mix");
 
   const summary = (todayRow as DailyConsultantSummary | null) ?? null;
-  const month_ = (monthRows as DailyConsultantSummary[]) ?? [];
+  const fetched = (monthRows as DailyConsultantSummary[]) ?? [];
+
+  // The compliance figures are about THIS month, so they are counted over the
+  // month window only - never over the extra day fetched above for the nudge.
+  const month_ = fetched.filter((r) => r.business_date >= monthStart);
 
   const submittedDays = month_.filter((r) => r.status === "submitted").length;
   const requiredDays = requiredDaysInMonth(year, month, today);
@@ -113,9 +124,8 @@ export default async function DashboardPage() {
   const firstName = profile.full_name.split(" ")[0] ?? profile.full_name;
 
   const targetRow_ = (targetRow as TargetShortfall | null) ?? null;
-  const yesterday = addDays(today, -1);
   const yesterdayMissing =
-    month_.find((r) => r.business_date === yesterday)?.status !== "submitted";
+    fetched.find((r) => r.business_date === yesterday)?.status !== "submitted";
 
   return (
     /* The bento grid.

@@ -7,6 +7,7 @@ import {
   describeWhen,
   formatSgDate,
   formatSgTime,
+  formatSgWhen,
   isOnTime,
   isWithinEditWindow,
   monthBounds,
@@ -234,5 +235,42 @@ describe("describing when something is", () => {
   it("falls back to a full date further out", () => {
     const at = sgDateTimeToInstant("2026-09-20", "14:00")!;
     expect(describeWhen(at, now)).toMatch(/Sept? 2026 at /);
+  });
+});
+
+describe("wording a moment for a notification", () => {
+  it("reads as a person would say it, in Singapore time", () => {
+    // The exact case that reached a real phone: booked for 3pm Singapore,
+    // stored as 07:00 UTC, and shown as the raw ISO string - unreadable, and
+    // eight hours off the time the person was actually given.
+    const at = new Date("2026-07-31T07:00:00Z");
+    expect(formatSgWhen(at)).toBe("Fri, 31 Jul, 3:00 pm");
+  });
+
+  it("never emits anything resembling an ISO timestamp", () => {
+    for (const iso of [
+      "2026-07-31T07:00:00Z",
+      "2026-01-01T16:00:00Z",
+      "2026-12-31T23:59:00Z",
+    ]) {
+      const label = formatSgWhen(iso);
+      expect(label).not.toMatch(/T\d{2}:\d{2}/);
+      expect(label).not.toMatch(/\+00:00|Z$/);
+      expect(label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
+  });
+
+  it("uses the Singapore date, not the UTC one", () => {
+    // 4pm UTC on 1 January is midnight on the 2nd in Singapore.
+    expect(formatSgWhen("2026-01-01T16:00:00Z")).toMatch(/2 Jan/);
+  });
+
+  it("accepts a string or a Date", () => {
+    const iso = "2026-07-31T07:00:00Z";
+    expect(formatSgWhen(iso)).toBe(formatSgWhen(new Date(iso)));
+  });
+
+  it("returns nothing rather than 'Invalid Date' for rubbish", () => {
+    expect(formatSgWhen("not a date")).toBe("");
   });
 });

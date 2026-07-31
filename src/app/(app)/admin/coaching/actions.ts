@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
-import { sgDateTimeToInstant } from "@/lib/sg-date";
+import { formatSgWhen, sgDateTimeToInstant } from "@/lib/sg-date";
 import {
   coachingBulkSchema,
   coachingCancelSchema,
@@ -125,7 +125,7 @@ export async function createCoaching(
     data.id,
     parsed.data.consultantId,
     parsed.data.title,
-    at.toISOString(),
+    formatSgWhen(at),
   );
 
   revalidateCoaching();
@@ -224,7 +224,7 @@ export async function createCoachingBulk(
       created.id,
       created.consultant_id,
       parsed.data.title,
-      created.scheduled_at ?? "",
+      created.scheduled_at ? formatSgWhen(created.scheduled_at) : "",
     );
   }
 
@@ -334,7 +334,7 @@ export async function scheduleCoaching(
         consultantId: data.consultant_id,
         kind: wasRequest ? "assigned" : "rescheduled",
         title: wasRequest ? "Coaching booked" : "Coaching moved",
-        body: `${parsed.data.title} - please check the new time`,
+        body: `${parsed.data.title} - ${formatSgWhen(at)}`,
         replaceExisting: true,
       });
     } catch (error) {

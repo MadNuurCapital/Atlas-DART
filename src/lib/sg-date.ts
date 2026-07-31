@@ -343,3 +343,29 @@ export function describeWhen(
   }
   return `${formatSgDate(toSgDateString(at))} at ${time}`;
 }
+
+/**
+ * A moment written the way a notification should say it.
+ *
+ * "Fri 31 Jul, 3:00 pm" - weekday first because that is how people hold an
+ * appointment in their head, and the full date after it because "Friday" alone
+ * is ambiguous once a booking is more than a week out.
+ *
+ * Exists because a notification body is not a place for an ISO timestamp. One
+ * reached a real phone reading "Monthly review - 2026-07-31T07:00:00+00:00",
+ * which is both unreadable and, being UTC, eight hours off what the person had
+ * actually been booked for.
+ */
+export function formatSgWhen(instant: Date | string): string {
+  const at = instant instanceof Date ? instant : new Date(instant);
+  if (Number.isNaN(at.getTime())) return "";
+
+  const date = new Intl.DateTimeFormat("en-SG", {
+    timeZone: SG_TIME_ZONE,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(at);
+
+  return `${date}, ${formatSgTime(at)}`;
+}

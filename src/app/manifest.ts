@@ -37,8 +37,12 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
         purpose: "any",
       },
+      // A separate file, not the same PNG declared twice. Android crops a
+      // maskable icon to a circle and keeps roughly the middle 80%; the "any"
+      // artwork reaches closer to the edge, so reusing it here would shave the
+      // gold square off the corner.
       {
-        src: "/icon-512.png",
+        src: "/icon-maskable-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

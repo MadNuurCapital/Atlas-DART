@@ -600,6 +600,85 @@ describe("the shape of a session is enforced by the database", () => {
     });
   });
 
+  it("lets an acknowledged session be completed", async () => {
+    // The bug an admin hit in real use: once the consultant tapped "Got it",
+    // Complete failed outright. The acknowledgement is a historical fact and
+    // must survive the session finishing - the export reports on it.
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      const admin = await seedUser(c, { role: "admin" });
+      const id = await seedScheduled(c, consultant.id, admin.id, "-1 hour");
+
+      await actAs(c, consultant.id);
+      await c.query(
+        "update public.coaching_sessions set acknowledged_at = now() where id = $1",
+        [id],
+      );
+
+      await actAs(c, admin.id);
+      await c.query(
+        "update public.coaching_sessions set status = 'completed', completed_at = now() where id = $1",
+        [id],
+      );
+
+      await asOwner(c);
+      const { rows } = await c.query<{
+        status: string;
+        acknowledged_at: Date | null;
+      }>(
+        "select status, acknowledged_at from public.coaching_sessions where id = $1",
+        [id],
+      );
+      expect(rows[0]?.status).toBe("completed");
+      expect(rows[0]?.acknowledged_at).not.toBeNull();
+    });
+  });
+
+  it("lets an acknowledged session be marked missed", async () => {
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      const admin = await seedUser(c, { role: "admin" });
+      const id = await seedScheduled(c, consultant.id, admin.id, "-1 hour");
+
+      await actAs(c, consultant.id);
+      await c.query(
+        "update public.coaching_sessions set acknowledged_at = now() where id = $1",
+        [id],
+      );
+
+      await actAs(c, admin.id);
+      await c.query(
+        "update public.coaching_sessions set status = 'missed' where id = $1",
+        [id],
+      );
+
+      await asOwner(c);
+      const { rows } = await c.query<{ status: string }>(
+        "select status from public.coaching_sessions where id = $1",
+        [id],
+      );
+      expect(rows[0]?.status).toBe("missed");
+    });
+  });
+
+  it("still refuses an acknowledgement on a request", async () => {
+    // The guard the constraint was actually for: there is nothing to
+    // acknowledge until a time exists.
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      await asOwner(c);
+
+      await expectRejection(() =>
+        c.query(
+          `insert into public.coaching_sessions
+             (consultant_id, created_by, title, category, status, acknowledged_at)
+           values ($1, $1, 'Review', 'ad_hoc', 'requested', now())`,
+          [consultant.id],
+        ),
+      );
+    });
+  });
+
   it("refuses an acknowledgement on a session that is not scheduled", async () => {
     await withRollback(async (c) => {
       const consultant = await seedUser(c);

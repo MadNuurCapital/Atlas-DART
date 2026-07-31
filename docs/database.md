@@ -25,6 +25,7 @@ PostgreSQL via Supabase. Migrations in `supabase/migrations/`, applied in filena
 | `0019_coaching_notes.sql` | Admin-only coaching notes, in their own table so RLS can hide them |
 | `0020_coaching_reminders_sent.sql` | Coaching notification bookkeeping, keyed by session |
 | `0021_cancelled_coaching_disappears.sql` | A cancelled session leaves the consultant's view at once; a declined request keeps its week |
+| `0022_acknowledgement_survives_completion.sql` | An acknowledgement is a historical fact and survives completion |
 
 Every migration is re-runnable. Applying the whole set to a database that
 already has some of it is a no-op rather than an error - triggers and policies

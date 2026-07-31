@@ -114,6 +114,7 @@ how many can be booked.
 | `0019_coaching_notes.sql` | Admin-only notes |
 | `0020_coaching_reminders_sent.sql` | Notification bookkeeping, keyed by session |
 | `0021_cancelled_coaching_disappears.sql` | Cancelled sessions leave the consultant's view at once |
+| `0022_acknowledgement_survives_completion.sql` | An acknowledged session can still be completed or marked missed |
 
 All forward-only and re-runnable, like every migration before them.
 

@@ -43,7 +43,7 @@ export default async function AdminUsersPage() {
       <div>
         <h1 className="text-lg font-semibold">People</h1>
         <p className="text-sm text-muted-foreground">
-          Invite consultants and admins, change roles, and deactivate leavers.
+          Invite advisors and admins, change roles, and deactivate leavers.
         </p>
       </div>
 

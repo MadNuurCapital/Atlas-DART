@@ -198,9 +198,9 @@ export function TeamBoard({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a consultant"
+            placeholder="Find an advisor"
             className="pl-9"
-            aria-label="Find a consultant"
+            aria-label="Find an advisor"
           />
         </div>
 
@@ -222,7 +222,7 @@ export function TeamBoard({
           <table className="w-full text-sm">
             <thead className="bg-secondary/60">
               <tr className="text-left">
-                <th scope="col" className="px-3 py-2.5 font-medium">Consultant</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">Advisor</th>
                 <th scope="col" className="px-2 py-2.5 font-medium">Status</th>
                 <th scope="col" className="px-2 py-2.5 text-right font-medium">D</th>
                 <th scope="col" className="px-2 py-2.5 text-right font-medium">TT</th>

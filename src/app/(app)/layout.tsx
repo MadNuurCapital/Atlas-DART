@@ -40,11 +40,14 @@ export default async function AppLayout({
   const firstName = profile.full_name.split(" ")[0];
 
   return (
-    <div className="flex min-h-dvh bg-secondary/30">
+    // spatial-wash paints two fixed pools of brand colour behind everything.
+    // Fixed, so they do not travel with the scroll - that stillness is what
+    // makes the tiles read as floating above a space rather than printed on it.
+    <div className="spatial-wash flex min-h-dvh">
       <SideNav isAdmin={isAdmin} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
+        <header className="glass sticky top-0 z-30 flex items-center justify-between gap-3 border-x-0 border-t-0 px-4 py-3">
           <div className="md:hidden">
             <Logo showWordmark={false} />
           </div>
@@ -80,8 +83,8 @@ export default async function AppLayout({
           </div>
         </header>
 
-        {/* pb-20 clears the fixed bottom navigation on mobile. */}
-        <main className="flex-1 space-y-4 px-4 pb-20 pt-4 md:pb-8">
+        {/* pb-24 clears the fixed bottom navigation on mobile. */}
+        <main className="flex-1 space-y-4 px-4 pb-24 pt-4 md:px-6 md:pb-10 md:pt-6">
           <SubmissionNag submitted={submittedToday} firstName={firstName} />
           {children}
         </main>

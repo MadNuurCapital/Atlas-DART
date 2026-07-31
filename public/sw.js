@@ -1,5 +1,5 @@
 /**
- * Service worker for DART & Case Tracker.
+ * Service worker for Atlas DART.
  *
  * Its only job is notifications. There is deliberately no offline caching:
  * a cached daily form would show stale figures and let someone submit against

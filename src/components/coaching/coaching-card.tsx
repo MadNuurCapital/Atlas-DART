@@ -297,7 +297,7 @@ function SessionCard({
 }
 
 /**
- * A consultant's coaching, on their dashboard.
+ * An advisor's coaching, on their dashboard.
  *
  * They see their own upcoming sessions and their own pending request, and
  * nothing else - no history, and never anybody else's. That is enforced by the
@@ -307,9 +307,11 @@ function SessionCard({
 export function CoachingCard({
   sessions,
   now = new Date(),
+  className,
 }: {
   sessions: MyCoaching[];
   now?: Date;
+  className?: string;
 }) {
   const [requesting, setRequesting] = useState(false);
 
@@ -330,7 +332,7 @@ export function CoachingCard({
   const [next, ...rest] = upcoming;
 
   return (
-    <div className="space-y-3" data-testid="coaching-section">
+    <div className={cn("space-y-3", className)} data-testid="coaching-section">
       {next && <SessionCard session={next} now={now} compact={false} />}
 
       {rest.length > 0 && (

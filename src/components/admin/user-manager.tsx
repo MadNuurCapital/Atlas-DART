@@ -207,7 +207,7 @@ function InviteDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="consultant">Consultant</SelectItem>
+                  <SelectItem value="consultant">Advisor</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
@@ -314,7 +314,7 @@ function UserRow({ user }: { user: ManagedUser }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="consultant">Consultant</SelectItem>
+            <SelectItem value="consultant">Advisor</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
           </SelectContent>
         </Select>

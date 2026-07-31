@@ -20,7 +20,7 @@ const ITEMS = [
 ] as const;
 
 /**
- * Fixed bottom navigation for the consultant pages.
+ * Fixed bottom navigation for the advisor pages.
  *
  * Bottom rather than top because this is a phone-first application and the
  * bottom of the screen is where a thumb actually reaches. Hidden on desktop,
@@ -36,7 +36,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-safe md:hidden"
+      className="glass fixed inset-x-0 bottom-0 z-40 border-x-0 border-b-0 pb-safe md:hidden"
     >
       <ul className="grid grid-cols-5">
         {ITEMS.map(({ href, label, icon: Icon }) => {

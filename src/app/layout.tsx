@@ -9,11 +9,11 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: {
-    default: "DART & Case Tracker",
-    template: "%s · DART & Case Tracker",
+    default: "Atlas DART",
+    template: "%s · Atlas DART",
   },
   description:
-    "Daily DART submissions and signed-case tracking for Integrated Barakah Wealth Advisory.",
+    "Advisor Tracking, Learning & Assistance System for Integrated Barakah Wealth Advisory.",
   // Internal tool - keep it out of search results entirely.
   robots: { index: false, follow: false },
 };
@@ -23,7 +23,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Not maximum-scale=1: pinch-zoom must stay available. Field inputs are
   // already 16px so iOS will not auto-zoom on focus.
-  themeColor: "#1e7fa6",
+  //
+  // Two entries so the browser chrome matches the page in either theme - one
+  // value would leave a bright bar above a dark app, which is the detail that
+  // makes an installed PWA look like a website in a frame.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef3f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#070d14" },
+  ],
 };
 
 export default function RootLayout({

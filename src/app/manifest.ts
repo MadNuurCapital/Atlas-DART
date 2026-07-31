@@ -7,19 +7,23 @@ import type { MetadataRoute } from "next";
  * the Home Screen, and it will only offer that properly for a site with a
  * manifest and a service worker. Without this file, iPhone users cannot
  * receive notifications at all.
+ *
+ * Renaming here only affects a fresh install. Anyone who added the old "DART"
+ * icon to their Home Screen keeps that label until they remove and re-add it;
+ * their push subscription is unaffected either way.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "DART & Case Tracker",
-    short_name: "DART",
+    name: "Atlas DART",
+    short_name: "Atlas",
     description:
-      "Daily DART submissions and signed-case tracking for Integrated Barakah Wealth Advisory.",
+      "Advisor Tracking, Learning & Assistance System for Integrated Barakah Wealth Advisory.",
     start_url: "/today",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#ffffff",
-    theme_color: "#1e7fa6",
+    background_color: "#eef3f8",
+    theme_color: "#0b5a92",
     icons: [
       {
         src: "/icon-192.png",
@@ -33,8 +37,12 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
         purpose: "any",
       },
+      // A separate file, not the same PNG declared twice. Android crops a
+      // maskable icon to a circle and keeps roughly the middle 80%; the "any"
+      // artwork reaches closer to the edge, so reusing it here would shave the
+      // gold square off the corner.
       {
-        src: "/icon-512.png",
+        src: "/icon-maskable-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

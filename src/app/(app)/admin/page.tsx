@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TeamBoard } from "@/components/admin/team-board";
+import { GrRing } from "@/components/dashboard/gr-ring";
 import { formatSgDate, sgToday, parseBusinessDate } from "@/lib/sg-date";
 import { formatCurrency, DEADLINE_LABEL } from "@/lib/constants";
 import type {
@@ -69,30 +70,44 @@ export default async function AdminOverviewPage() {
     .sort((a, b) => Number(a.compliance) - Number(b.compliance))
     .slice(0, 5);
 
+  // Today, at a glance. Previously an admin had to read down the board to work
+  // out how many were still outstanding, which is the first thing they want to
+  // know when they open this page an hour before the deadline.
+  const submittedToday = rows.filter((r) => r.status === "submitted").length;
+
+  const teamAchievement =
+    teamMonthlyTarget > 0 ? teamMtdGr / teamMonthlyTarget : null;
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       <div>
-        <h1 className="text-lg font-semibold">Team overview</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Team overview</h1>
         <p className="text-sm text-muted-foreground">
           {formatSgDate(today)} · submissions close at {DEADLINE_LABEL}
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-5">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Month-to-date GR
-            </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {formatCurrency(teamMtdGr)}
-            </p>
-            {teamMonthlyTarget > 0 && (
-              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                of {formatCurrency(teamMonthlyTarget)} ·{" "}
-                {((teamMtdGr / teamMonthlyTarget) * 100).toFixed(0)}%
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="edge-light lifted sm:col-span-2">
+          <CardContent className="flex items-center justify-between gap-4 pt-5">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Month-to-date GR
               </p>
-            )}
+              <p className="mt-1 text-3xl font-semibold tabular-nums">
+                {formatCurrency(teamMtdGr)}
+              </p>
+              {teamMonthlyTarget > 0 && (
+                <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                  of {formatCurrency(teamMonthlyTarget)}
+                </p>
+              )}
+            </div>
+            <GrRing
+              ratio={teamAchievement}
+              label="Team month to date"
+              className="max-w-[6.5rem] shrink-0"
+            />
           </CardContent>
         </Card>
 
@@ -108,30 +123,47 @@ export default async function AdminOverviewPage() {
         </Card>
 
         <Card>
-          <CardContent className="space-y-2 pt-5">
+          <CardContent className="pt-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Submitted today
+            </p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">
+              {submittedToday}
+              <span className="text-base font-medium text-muted-foreground">
+                /{rows.length}
+              </span>
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {rows.length - submittedToday === 0
+                ? "Everybody is in"
+                : `${rows.length - submittedToday} still outstanding`}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="sm:col-span-2 lg:col-span-4">
+          <CardContent className="flex flex-wrap items-center gap-2 pt-5">
+            <p className="mr-1 text-xs uppercase tracking-wide text-muted-foreground">
               Quick actions
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="secondary">
-                <Link href="/admin/export">
-                  <Download aria-hidden="true" />
-                  Export
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="ghost">
-                <Link href="/admin/targets">
-                  <Target aria-hidden="true" />
-                  Targets
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="ghost">
-                <Link href="/admin/coaching">
-                  <GraduationCap aria-hidden="true" />
-                  Coaching
-                </Link>
-              </Button>
-            </div>
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/admin/export">
+                <Download aria-hidden="true" />
+                Export
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/admin/targets">
+                <Target aria-hidden="true" />
+                Targets
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/admin/coaching">
+                <GraduationCap aria-hidden="true" />
+                Coaching
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

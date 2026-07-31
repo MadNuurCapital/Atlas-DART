@@ -19,7 +19,10 @@ import {
 } from "@/lib/sg-date";
 import { DEADLINE_LABEL, CAMPAIGN_STATUS_LABELS } from "@/lib/constants";
 import { compliancePercent } from "@/lib/targets";
-import { TargetPanel } from "@/components/dashboard/target-panel";
+import {
+  MonthTargetTile,
+  YearTargetTile,
+} from "@/components/dashboard/target-panel";
 import { CaseMixPanel } from "@/components/dashboard/case-mix-panel";
 import type {
   CaseMixByCategory,
@@ -33,11 +36,11 @@ export const dynamic = "force-dynamic";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg bg-secondary px-2 py-2.5 text-center">
-      <div className="text-lg font-semibold tabular-nums text-secondary-foreground">
+    <div className="rounded-xl bg-secondary/70 px-2 py-3 text-center">
+      <div className="text-xl font-semibold tabular-nums text-secondary-foreground">
         {value}
       </div>
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
     </div>
@@ -49,6 +52,13 @@ export default async function DashboardPage() {
   const today = sgToday();
   const { year, month } = parseBusinessDate(today);
   const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+  const yesterday = addDays(today, -1);
+
+  // Read from whichever is earlier. On the 1st, yesterday belongs to last month
+  // and would fall outside a month-start window - which is why the "yesterday
+  // is not submitted" nudge used to fire for everybody on the 1st of every
+  // month, whether they had submitted or not.
+  const readFrom = yesterday < monthStart ? yesterday : monthStart;
 
   const supabase = await createClient();
 
@@ -64,7 +74,7 @@ export default async function DashboardPage() {
         .from("v_daily_consultant_summary")
         .select("*")
         .eq("user_id", profile.id)
-        .gte("business_date", monthStart)
+        .gte("business_date", readFrom)
         .lte("business_date", today),
       supabase
         .from("v_target_shortfall")
@@ -97,7 +107,11 @@ export default async function DashboardPage() {
   const mixRows = unwrap(mixRes, "the category mix");
 
   const summary = (todayRow as DailyConsultantSummary | null) ?? null;
-  const month_ = (monthRows as DailyConsultantSummary[]) ?? [];
+  const fetched = (monthRows as DailyConsultantSummary[]) ?? [];
+
+  // The compliance figures are about THIS month, so they are counted over the
+  // month window only - never over the extra day fetched above for the nudge.
+  const month_ = fetched.filter((r) => r.business_date >= monthStart);
 
   const submittedDays = month_.filter((r) => r.status === "submitted").length;
   const requiredDays = requiredDaysInMonth(year, month, today);
@@ -109,10 +123,22 @@ export default async function DashboardPage() {
   const isSubmitted = summary?.status === "submitted";
   const firstName = profile.full_name.split(" ")[0] ?? profile.full_name;
 
+  const targetRow_ = (targetRow as TargetShortfall | null) ?? null;
+  const yesterdayMissing =
+    fetched.find((r) => r.business_date === yesterday)?.status !== "submitted";
+
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Assalamualaikum, {firstName}</h1>
+    /* The bento grid.
+     *
+     * Six columns on a laptop so tiles can be 4+2 or 3+3 or 2+2+2 and still
+     * line up; two on a tablet; one on a phone, where a grid of small tiles is
+     * just a stack with extra steps. `auto-rows-min` keeps a short tile short
+     * rather than stretching it to match its tallest neighbour. */
+    <div className="mx-auto grid w-full max-w-6xl auto-rows-min grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="sm:col-span-2 lg:col-span-6">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Assalamualaikum, {firstName}
+        </h1>
         <p className="text-sm text-muted-foreground">
           {formatSgDate(today)} · submissions close at {DEADLINE_LABEL}
         </p>
@@ -120,7 +146,10 @@ export default async function DashboardPage() {
 
       <Card
         className={
-          isSubmitted ? undefined : "border-status-late/40 bg-status-late/5"
+          isSubmitted
+            ? // The lit edge marks the one tile the eye should land on first.
+              "edge-light lifted flex flex-col sm:col-span-2 lg:col-span-4"
+            : "border-status-late/40 bg-status-late/5 flex flex-col sm:col-span-2 lg:col-span-4"
         }
       >
         <CardHeader className="pb-3">
@@ -140,7 +169,10 @@ export default async function DashboardPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        {/* flex-1 + mt-auto below: when the ring tile beside this one is
+            taller, the leftover height opens up between the figures and the
+            button rather than pooling as dead space under it. */}
+        <CardContent className="flex flex-1 flex-col gap-4">
           {summary ? (
             <>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -180,25 +212,41 @@ export default async function DashboardPage() {
             </p>
           )}
 
-          <Button asChild size="lg" className="w-full sm:w-auto">
-            <Link href="/today">
-              {isSubmitted ? "Review or update today" : "Fill in today"}
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </Button>
+          <div className="mt-auto space-y-3">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <Link href="/today">
+                {isSubmitted ? "Review or update today" : "Fill in today"}
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
+
+            {/* Yesterday, inside today's tile rather than as a card of its
+                own. A separate dashed box for a one-line nudge was a whole
+                tile spent on something that is usually not true. */}
+            {yesterdayMissing && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border px-3 py-2.5">
+                <p className="text-sm text-muted-foreground">
+                  Yesterday ({formatSgDate(yesterday)}) is not submitted.
+                </p>
+                <Button asChild size="sm" variant="secondary">
+                  <Link href={`/today?date=${yesterday}`}>Fill it in</Link>
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      <CoachingCard sessions={coaching} />
+      {targetRow_ && (
+        <MonthTargetTile target={targetRow_} className="lg:col-span-2" />
+      )}
 
-      <TargetPanel
-        target={(targetRow as TargetShortfall | null) ?? null}
-        pending={(pendingRow as PendingInception | null) ?? null}
+      <CoachingCard
+        sessions={coaching}
+        className="sm:col-span-2 lg:col-span-3"
       />
 
-      <CaseMixPanel rows={(mixRows as CaseMixByCategory[]) ?? []} />
-
-      <Card>
+      <Card className="sm:col-span-2 lg:col-span-3">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">This month</CardTitle>
         </CardHeader>
@@ -227,23 +275,18 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {(() => {
-        const yesterday = addDays(today, -1);
-        const yesterdayRow = month_.find((r) => r.business_date === yesterday);
-        if (yesterdayRow?.status === "submitted") return null;
-        return (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-              <p className="text-sm text-muted-foreground">
-                Yesterday ({formatSgDate(yesterday)}) is not submitted.
-              </p>
-              <Button asChild size="sm" variant="secondary">
-                <Link href={`/today?date=${yesterday}`}>Fill it in</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        );
-      })()}
+      <CaseMixPanel
+        rows={(mixRows as CaseMixByCategory[]) ?? []}
+        className="sm:col-span-2 lg:col-span-4"
+      />
+
+      {targetRow_ && (
+        <YearTargetTile
+          target={targetRow_}
+          pending={(pendingRow as PendingInception | null) ?? null}
+          className="lg:col-span-2"
+        />
+      )}
     </div>
   );
 }

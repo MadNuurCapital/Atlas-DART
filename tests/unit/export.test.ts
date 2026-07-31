@@ -263,7 +263,10 @@ describe("monthly workbook", () => {
     const sheet = wb.getWorksheet("Daily Team Summary")!;
     const headers = sheet.getRow(1).values as (string | undefined)[];
     expect(headers).toContain("Date");
-    expect(headers).toContain("Consultant");
+    // The interface says Advisor; the data key stays `consultant` because the
+    // database role value does.
+    expect(headers).toContain("Advisor");
+    expect(headers).not.toContain("Consultant");
     expect(headers).toContain("D");
     expect(headers).toContain("TT");
     expect(headers).toContain("Active GR");

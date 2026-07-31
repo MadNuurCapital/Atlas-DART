@@ -1,16 +1,21 @@
-# DART & Case Tracker
+# Atlas DART
 
-Mobile-first daily activity and signed-case tracking for **Integrated Barakah Wealth Advisory**.
+**A**dvisor **T**racking, **L**earning **&** **A**ssistance **S**ystem — for **Integrated Barakah Wealth Advisory**.
 
-Consultants submit their daily DART figures from a phone in under two minutes. Management sees the whole team live, without refreshing, and downloads a monthly Excel meeting report that reconciles exactly to the dashboard.
+Advisors submit their daily DART figures from a phone in under two minutes. Management sees the whole team live, without refreshing, and downloads a monthly Excel meeting report that reconciles exactly to the dashboard. Admins book and run one-to-one coaching alongside it.
 
-Replaces the per-consultant `Consultant_XXX.numbers` workbooks.
+Replaces the per-advisor `Consultant_XXX.numbers` workbooks.
+
+> **A note on the word "consultant".** The interface says *Advisor*. The database
+> still stores the role as `consultant`, and every column, view, policy and API
+> field keeps that name. Renaming a live role value would mean rewriting every
+> RLS policy on a system with real users in it, to change a word nobody sees.
 
 ---
 
 ## Status
 
-**All six phases complete.** The MVP is feature-complete and awaiting the client's Supabase, Netlify and Resend accounts.
+**Live in production.** All six build phases plus private coaching are complete and in daily use.
 
 | Phase | Scope | State |
 |---|---|---|
@@ -115,11 +120,33 @@ an admin exists — then tells you exactly what to fix if not. Read-only.
 No local tooling to hand? `supabase/health-check.sql` runs the same checks as a
 single query you can paste into the Supabase SQL editor.
 
+## Design
+
+Bento tiles over a fixed "spatial wash" — two soft pools of brand colour that
+do not travel with the scroll, which is what makes the tiles read as floating
+above a space rather than printed on a page.
+
+Glass is deliberately restrained. `backdrop-filter` goes on chrome — the
+sidebar, the header, the bottom navigation, the login card — and never behind a
+figure somebody has to read exactly; a GR number at 72% opacity over a moving
+background is a worse product however good it looks. It is also the most
+expensive thing on the page for an older phone, which is the other reason it is
+on five fixed surfaces rather than on every row of a scrolling list.
+
+All colour lives in `src/app/globals.css` as custom properties, and there is not
+a single `dark:` utility in the codebase — both themes come out of that one
+file. Brand values are measured from the supplied logo: `#0B5A92` and `#F6CE6F`.
+Three places cannot read a CSS variable and so spell the blue out, each with a
+comment saying so: the PWA manifest, the reminder email template, and the Excel
+header fill.
+
+`prefers-reduced-motion` and `prefers-contrast: more` both drop the blur and the
+halo for solid surfaces. The layout carries the design without them.
+
 ## Still required from the client
 
-- Exact brand hex codes, or the logo file. Current values in `src/app/globals.css` are estimated from the supplied image; all colour is defined in that one file.
 - Confirmation of the seeded insurer list in `supabase/migrations/0012_seed_insurers.sql`.
-- Supabase project, Netlify site, Resend key with a verified sender domain, and the two admin accounts.
+- Resend key with a verified sender domain, if email reminders are wanted alongside push.
 
 ## Documentation
 

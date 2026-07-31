@@ -235,7 +235,9 @@ export function appUrl(): string {
   return (process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
 }
 
-const BRAND_BLUE = "#1e7fa6";
+/* Email clients have no CSS variables, so the one brand colour these templates
+   use is spelled out here. It must match --brand-blue in globals.css. */
+const BRAND_BLUE = "#0b5a92";
 
 export function consultantEmail(name: string, businessDate: string) {
   const firstName = name.split(" ")[0] ?? name;
@@ -248,7 +250,7 @@ export function consultantEmail(name: string, businessDate: string) {
   ].join("");
 
   const html = `
-    <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;color:#4d4d4f;line-height:1.5">
+    <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;color:#0d1b26;line-height:1.5">
       <p>Assalamualaikum ${escapeHtml(firstName)},</p>
       <p>Your DART update for <strong>${escapeHtml(readableDate)}</strong> has not been submitted yet. Please complete it as soon as possible.</p>
       ${
@@ -274,7 +276,7 @@ export function adminDigestEmail(
     return {
       subject: `DART: all submitted for ${businessDate}`,
       text,
-      html: `<div style="font-family:system-ui,sans-serif;color:#4d4d4f"><p>${escapeHtml(text)}</p></div>`,
+      html: `<div style="font-family:system-ui,sans-serif;color:#0d1b26"><p>${escapeHtml(text)}</p></div>`,
     };
   }
 
@@ -287,7 +289,7 @@ export function adminDigestEmail(
   ].join("\n");
 
   const html = `
-    <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;color:#4d4d4f;line-height:1.5">
+    <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;color:#0d1b26;line-height:1.5">
       <p><strong>${missing.length}</strong> ${missing.length === 1 ? "person has" : "people have"} not submitted a DART update for <strong>${escapeHtml(readableDate)}</strong>:</p>
       <ul>${names.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>
       ${

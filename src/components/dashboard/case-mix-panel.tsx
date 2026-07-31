@@ -12,9 +12,11 @@ import type { CaseMixByCategory } from "@/types/database";
 export function CaseMixPanel({
   rows,
   title = "Case mix this month",
+  className,
 }: {
   rows: CaseMixByCategory[];
   title?: string;
+  className?: string;
 }) {
   const byType = new Map(rows.map((r) => [r.policy_type, r]));
   const present = POLICY_TYPES.filter((t) => byType.has(t));
@@ -24,7 +26,7 @@ export function CaseMixPanel({
 
   if (present.length === 0) {
     return (
-      <Card>
+      <Card className={className}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{title}</CardTitle>
         </CardHeader>
@@ -38,7 +40,7 @@ export function CaseMixPanel({
   }
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>

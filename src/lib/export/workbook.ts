@@ -130,7 +130,8 @@ export type CaseMixRow = {
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
   pattern: "solid",
-  fgColor: { argb: "FF1E7FA6" },
+  // Atlas blue. ARGB, and it must track --brand-blue in globals.css.
+  fgColor: { argb: "FF0B5A92" },
 };
 
 /** A date-only value as a real Date, so Excel treats it as a date. */
@@ -206,13 +207,13 @@ function autoFilter(sheet: ExcelJS.Worksheet) {
 
 export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "DART & Case Tracker";
+  wb.creator = "Atlas DART";
   wb.created = data.generatedAt;
 
   // ---- 1. Daily Team Summary -------------------------------------------
   const daily = addSheet(wb, "Daily Team Summary", [
     { header: "Date", key: "date", width: 12, style: { numFmt: EXCEL_DATE_FORMAT } },
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
     { header: "D", key: "d", width: 6 },
     { header: "TT", key: "tt", width: 6 },
     { header: "AO", key: "ao", width: 6 },
@@ -258,7 +259,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
   // ---- 2. Appointment Details ------------------------------------------
   const appts = addSheet(wb, "Appointment Details", [
     { header: "Date", key: "date", width: 12, style: { numFmt: EXCEL_DATE_FORMAT } },
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
     { header: "Prospect Name", key: "prospect", width: 24 },
     { header: "Appointment Type", key: "type", width: 22 },
     { header: "Note", key: "note", width: 40 },
@@ -282,7 +283,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
   const cases = addSheet(wb, "Case Tracker", [
     { header: "Date Submitted", key: "submitted", width: 15, style: { numFmt: EXCEL_DATE_FORMAT } },
     { header: "Date Incepted", key: "incepted", width: 15, style: { numFmt: EXCEL_DATE_FORMAT } },
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
     { header: "Client Name", key: "client", width: 24 },
     { header: "Insurer", key: "insurer", width: 22 },
     { header: "Policy Name", key: "policy", width: 26 },
@@ -314,7 +315,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
 
   // ---- 4. Targets and Shortfall ----------------------------------------
   const targets = addSheet(wb, "Targets and Shortfall", [
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
     { header: "Monthly Target", key: "mTarget", width: 15, style: { numFmt: EXCEL_CURRENCY_FORMAT } },
     { header: "Month-to-Date GR", key: "mGr", width: 17, style: { numFmt: EXCEL_CURRENCY_FORMAT } },
     { header: "Monthly Shortfall", key: "mShort", width: 17, style: { numFmt: EXCEL_CURRENCY_FORMAT } },
@@ -344,7 +345,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
 
   // ---- 5. Submission Compliance ----------------------------------------
   const compliance = addSheet(wb, "Submission Compliance", [
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
     { header: "Required Days", key: "required", width: 14 },
     { header: "Submitted Days", key: "submitted", width: 15 },
     { header: "On-Time Days", key: "onTime", width: 14 },
@@ -370,7 +371,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
   // Reproduces the cross-tab from the original Numbers workbook: one row per
   // consultant, then Counts and APE repeated for every policy type.
   const mixColumns: Partial<ExcelJS.Column>[] = [
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
   ];
   for (const type of POLICY_TYPES) {
     mixColumns.push({ header: `${type} Count`, key: `${type}_count`, width: 12 });
@@ -428,7 +429,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
       style: { numFmt: EXCEL_DATE_FORMAT },
     },
     { header: "Time", key: "time", width: 10 },
-    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Advisor", key: "consultant", width: 22 },
     { header: "Coach", key: "coach", width: 22 },
     { header: "Category", key: "category", width: 16 },
     { header: "Title", key: "title", width: 28 },

@@ -314,9 +314,12 @@ export function CoachingCard({
   const [requesting, setRequesting] = useState(false);
 
   const pendingRequest = sessions.find((s) => s.status === "requested");
-  const cancelled = sessions.filter(
-    (s) => s.status === "cancelled" || s.status === "declined",
-  );
+
+  // Cancelled sessions are not shown at all - the person has already had a
+  // notification, and a card they can do nothing about is just clutter. A
+  // DECLINED request is different: they asked for something and are owed an
+  // answer, and an answer that arrives as silence reads as being ignored.
+  const declined = sessions.filter((s) => s.status === "declined");
   const upcoming = sessions
     .filter((s) => s.status === "scheduled" && s.scheduled_at)
     .sort(
@@ -346,14 +349,12 @@ export function CoachingCard({
         </div>
       )}
 
-      {cancelled.map((session) => (
+      {declined.map((session) => (
         <Card key={session.id} className="border-dashed">
           <CardContent className="pt-5">
             <p className="flex items-center gap-1.5 text-sm font-medium">
               <Ban className="size-4 text-muted-foreground" aria-hidden="true" />
-              {session.status === "declined"
-                ? "Coaching request declined"
-                : "Coaching cancelled"}
+              Coaching request declined
             </p>
             {session.cancellation_reason && (
               <p className="mt-1 text-sm text-muted-foreground">

@@ -163,7 +163,9 @@ describe("a consultant sees only their own coaching", () => {
     });
   });
 
-  it("shows a recent cancellation, so nobody waits for a meeting that is off", async () => {
+  it("removes a cancelled session from their view immediately", async () => {
+    // They have already had a notification. A card they can do nothing about
+    // is clutter, so it goes the moment it is cancelled - not after a week.
     await withRollback(async (c) => {
       const consultant = await seedUser(c);
       const admin = await seedUser(c, { role: "admin" });
@@ -173,33 +175,81 @@ describe("a consultant sees only their own coaching", () => {
            (consultant_id, created_by, title, category, status, scheduled_at,
             cancelled_at, cancellation_reason)
          values ($1, $2, 'Monthly review', 'monthly_review', 'cancelled',
-                 now() + interval '1 day', now() - interval '1 day', 'Clash')`,
-        [consultant.id, admin.id],
-      );
-
-      await actAs(c, consultant.id);
-      const { rows } = await c.query("select * from public.coaching_sessions");
-      expect(rows).toHaveLength(1);
-    });
-  });
-
-  it("stops showing a cancellation after a week", async () => {
-    await withRollback(async (c) => {
-      const consultant = await seedUser(c);
-      const admin = await seedUser(c, { role: "admin" });
-      await asOwner(c);
-      await c.query(
-        `insert into public.coaching_sessions
-           (consultant_id, created_by, title, category, status, scheduled_at,
-            cancelled_at, cancellation_reason)
-         values ($1, $2, 'Monthly review', 'monthly_review', 'cancelled',
-                 now() - interval '20 days', now() - interval '8 days', 'Clash')`,
+                 now() + interval '1 day', now(), 'Clash')`,
         [consultant.id, admin.id],
       );
 
       await actAs(c, consultant.id);
       const { rows } = await c.query("select * from public.coaching_sessions");
       expect(rows).toHaveLength(0);
+    });
+  });
+
+  it("still shows a recently declined request, with its reason", async () => {
+    // Different case: they ASKED for this, and an answer arriving as silence
+    // reads as having been ignored.
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      await asOwner(c);
+      await c.query(
+        `insert into public.coaching_sessions
+           (consultant_id, created_by, title, category, status,
+            cancelled_at, cancellation_reason)
+         values ($1, $1, 'Coaching request', 'ad_hoc', 'declined',
+                 now() - interval '1 day', 'Covered last week')`,
+        [consultant.id],
+      );
+
+      await actAs(c, consultant.id);
+      const { rows } = await c.query<{ cancellation_reason: string }>(
+        "select cancellation_reason from public.coaching_sessions",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.cancellation_reason).toBe("Covered last week");
+    });
+  });
+
+  it("stops showing a declined request after a week", async () => {
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      await asOwner(c);
+      await c.query(
+        `insert into public.coaching_sessions
+           (consultant_id, created_by, title, category, status,
+            cancelled_at, cancellation_reason)
+         values ($1, $1, 'Coaching request', 'ad_hoc', 'declined',
+                 now() - interval '8 days', 'Covered last week')`,
+        [consultant.id],
+      );
+
+      await actAs(c, consultant.id);
+      const { rows } = await c.query("select * from public.coaching_sessions");
+      expect(rows).toHaveLength(0);
+    });
+  });
+
+  it("keeps a cancelled session in full for admins", async () => {
+    // Hidden from the consultant, never deleted. The record and its reason
+    // stay for management and for the export.
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      const admin = await seedUser(c, { role: "admin" });
+      await asOwner(c);
+      await c.query(
+        `insert into public.coaching_sessions
+           (consultant_id, created_by, title, category, status, scheduled_at,
+            cancelled_at, cancellation_reason)
+         values ($1, $2, 'Monthly review', 'monthly_review', 'cancelled',
+                 now() + interval '1 day', now(), 'Clash')`,
+        [consultant.id, admin.id],
+      );
+
+      await actAs(c, admin.id);
+      const { rows } = await c.query<{ cancellation_reason: string }>(
+        "select cancellation_reason from public.coaching_sessions",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.cancellation_reason).toBe("Clash");
     });
   });
 

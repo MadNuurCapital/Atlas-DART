@@ -58,9 +58,14 @@ What a consultant can see of their own coaching is enforced the same way, in the
 policy rather than in a page:
 
 - `requested` and `scheduled` — yes
-- `cancelled` and `declined` — for 7 days, so nobody waits for a meeting that is
-  off, then it disappears
+- `declined` — for 7 days, with the reason. They asked for it and are owed an
+  answer; an answer arriving as silence reads as having been ignored
+- `cancelled` — **never**. They get a notification the moment it happens, and a
+  card they can do nothing about is only clutter
 - `completed` and `missed` — never
+
+A cancelled session is hidden from the consultant, not deleted. It stays in
+full for admins and in the export, with its reason.
 
 ## Reminders
 
@@ -108,6 +113,7 @@ how many can be booked.
 | `0018_coaching_sessions.sql` | The table, its constraints, the reschedule and column-guard triggers, RLS, realtime |
 | `0019_coaching_notes.sql` | Admin-only notes |
 | `0020_coaching_reminders_sent.sql` | Notification bookkeeping, keyed by session |
+| `0021_cancelled_coaching_disappears.sql` | Cancelled sessions leave the consultant's view at once |
 
 All forward-only and re-runnable, like every migration before them.
 

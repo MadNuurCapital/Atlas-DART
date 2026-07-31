@@ -197,7 +197,9 @@ describe("a consultant's coaching card", () => {
     expect(screen.queryByTestId("acknowledge-coaching")).not.toBeInTheDocument();
   });
 
-  it("explains a cancellation rather than just losing the card", () => {
+  it("shows nothing at all once a session is cancelled", () => {
+    // The person has already had a notification. A card they can do nothing
+    // about is clutter, so it goes rather than lingering.
     render(
       <CoachingCard
         sessions={[
@@ -210,10 +212,27 @@ describe("a consultant's coaching card", () => {
       />,
     );
 
-    expect(screen.getByText("Coaching cancelled")).toBeInTheDocument();
+    expect(screen.queryByText("Coaching cancelled")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Clashes with the team meeting"),
-    ).toBeInTheDocument();
+      screen.queryByText("Clashes with the team meeting"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("No coaching booked")).toBeInTheDocument();
+  });
+
+  it("keeps the next session visible when an earlier one is cancelled", () => {
+    render(
+      <CoachingCard
+        sessions={[
+          session({ id: "off", status: "cancelled", cancellation_reason: "Clash" }),
+          session({ id: "on", title: "Closing practice" }),
+        ]}
+        now={NOW}
+      />,
+    );
+
+    expect(screen.getByTestId("coaching-card")).toHaveTextContent(
+      "Closing practice",
+    );
   });
 
   it("says when a request was declined, and why", () => {

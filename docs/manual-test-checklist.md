@@ -143,7 +143,8 @@ Anything that fails goes back as a bug, not as a note. A checklist with unticked
 - [ ] The time on the card is the time you set, in Singapore terms.
 - [ ] Tap **Got it**. The admin list shows it acknowledged.
 - [ ] Move the session. The acknowledgement clears and they are notified again.
-- [ ] Cancel it with a reason. They see the reason; it leaves their upcoming.
+- [ ] Cancel it with a reason. They get a notification and the card goes at once.
+- [ ] The cancelled session is still on the admin list, with its reason.
 - [ ] Mark one completed. It disappears from the consultant's view entirely.
 - [ ] Reopen it. It comes back as scheduled.
 - [ ] As a consultant, request coaching. Both admins see it waiting.

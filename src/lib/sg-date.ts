@@ -272,3 +272,74 @@ function dateTuple(date: BusinessDate): [number, number, number] {
   const { year, month, day } = parseBusinessDate(date);
   return [year, month, day];
 }
+
+/**
+ * Turn a date and a time as typed on a phone into an instant.
+ *
+ * The two halves come from a date input and a time input, neither of which
+ * carries a timezone. Interpreting them in Singapore is what makes "2:00 PM"
+ * mean two in the afternoon there rather than two in the afternoon wherever
+ * the server happens to be running - which, on Netlify, is not Singapore.
+ *
+ * Goes through sgWallClockToUtc rather than appending a literal "+08:00",
+ * because the offset is read from the timezone database for that specific
+ * instant. Singapore has not moved its clocks since 1982 and probably never
+ * will, but a hardcoded offset is exactly the assumption this module was
+ * written to avoid.
+ *
+ * Returns null rather than an Invalid Date, so a caller cannot store one.
+ */
+export function sgDateTimeToInstant(
+  date: BusinessDate,
+  time: string,
+): Date | null {
+  if (!ISO_DATE.test(date)) return null;
+
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+
+  const { year, month, day } = parseBusinessDate(date);
+  const at = sgWallClockToUtc(year, month, day, hour, minute);
+  if (Number.isNaN(at.getTime())) return null;
+
+  // Date arithmetic rolls over rather than complaining: month 13 quietly
+  // becomes January of the next year, and 31 February becomes 3 March. A
+  // malformed date silently turning into a valid but different one is worse
+  // than a rejection, so confirm the instant really lands on the date asked
+  // for. This catches every impossible date without enumerating any of them.
+  return toSgDateString(at) === date ? at : null;
+}
+
+/**
+ * How far away a moment is, in plain words: "Tomorrow at 2:00 pm".
+ *
+ * Compared by Singapore CALENDAR DAY rather than by elapsed hours, because
+ * "tomorrow" is about the date on the wall, not about being within 24 hours -
+ * a session at 9am tomorrow is tomorrow even when it is 11pm tonight.
+ */
+export function describeWhen(
+  instant: Date | string,
+  now: Date = new Date(),
+): string {
+  const at = instant instanceof Date ? instant : new Date(instant);
+  if (Number.isNaN(at.getTime())) return "";
+
+  const time = formatSgTime(at);
+  const days = daysBetween(toSgDateString(now), toSgDateString(at));
+
+  if (days === 0) return `Today at ${time}`;
+  if (days === 1) return `Tomorrow at ${time}`;
+  if (days === -1) return `Yesterday at ${time}`;
+  if (days > 1 && days < 7) {
+    const weekday = new Intl.DateTimeFormat("en-SG", {
+      timeZone: SG_TIME_ZONE,
+      weekday: "long",
+    }).format(at);
+    return `${weekday} at ${time}`;
+  }
+  return `${formatSgDate(toSgDateString(at))} at ${time}`;
+}

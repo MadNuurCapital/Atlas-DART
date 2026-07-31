@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Download, Target, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Download,
+  GraduationCap,
+  Target,
+  Users,
+} from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { unwrap } from "@/lib/query";
 import { createClient } from "@/lib/supabase/server";
@@ -117,6 +123,12 @@ export default async function AdminOverviewPage() {
                 <Link href="/admin/targets">
                   <Target aria-hidden="true" />
                   Targets
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="ghost">
+                <Link href="/admin/coaching">
+                  <GraduationCap aria-hidden="true" />
+                  Coaching
                 </Link>
               </Button>
             </div>

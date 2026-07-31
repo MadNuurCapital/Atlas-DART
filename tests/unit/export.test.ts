@@ -136,6 +136,39 @@ function fixture(overrides: Partial<ExportData> = {}): ExportData {
       },
     ],
 
+    coachingRows: [
+      {
+        scheduledAt: "2026-03-12T06:00:00Z", // 2pm Singapore
+        consultant: "Ahmad",
+        coach: "Director",
+        category: "Monthly Review",
+        title: "March review",
+        status: "Completed",
+        acknowledged: true,
+        location: "Office meeting room",
+      },
+      {
+        scheduledAt: "2026-03-20T01:30:00Z", // 9:30am Singapore
+        consultant: "Siti",
+        coach: "Director",
+        category: "Ad-hoc",
+        title: "Closing practice",
+        status: "Scheduled",
+        acknowledged: false,
+        location: null,
+      },
+      {
+        scheduledAt: null,
+        consultant: "Siti",
+        coach: null,
+        category: "Ad-hoc",
+        title: "Coaching request",
+        status: "Requested",
+        acknowledged: false,
+        location: null,
+      },
+    ],
+
     caseMixRows: [
       {
         consultant: "Ahmad",
@@ -164,7 +197,7 @@ describe("monthly workbook", () => {
     wb = await buildWorkbook(fixture());
   });
 
-  it("creates exactly six worksheets, in the agreed order", () => {
+  it("creates exactly seven worksheets, in the agreed order", () => {
     expect(wb.worksheets.map((s) => s.name)).toEqual([
       "Daily Team Summary",
       "Appointment Details",
@@ -172,7 +205,58 @@ describe("monthly workbook", () => {
       "Targets and Shortfall",
       "Submission Compliance",
       "Case Mix by Category",
+      "Coaching",
     ]);
+  });
+
+  it("writes coaching in Singapore time, not UTC", () => {
+    // 2pm Singapore is 6am UTC. Writing the raw instant would have the monthly
+    // meeting reading every session as six hours earlier than it happened.
+    const sheet = wb.getWorksheet("Coaching")!;
+    const row = sheet.getRow(2);
+    const date = row.getCell(1).value as Date;
+
+    expect(date.getUTCDate()).toBe(12);
+    expect(row.getCell(2).value).toBe("14:00");
+  });
+
+  it("names the consultant and coach rather than their ids", () => {
+    const sheet = wb.getWorksheet("Coaching")!;
+    const row = sheet.getRow(2);
+    expect(row.getCell(3).value).toBe("Ahmad");
+    expect(row.getCell(4).value).toBe("Director");
+  });
+
+  it("shows acknowledgement as a plain yes or no", () => {
+    const sheet = wb.getWorksheet("Coaching")!;
+    expect(sheet.getRow(2).getCell(8).value).toBe("Yes");
+    expect(sheet.getRow(3).getCell(8).value).toBe("No");
+  });
+
+  it("keeps a session with no time from breaking the sheet", () => {
+    // A pending request has no date. It must not throw and must not invent one.
+    const sheet = wb.getWorksheet("Coaching")!;
+    const row = sheet.getRow(4);
+    expect(row.getCell(1).value).toBeNull();
+    expect(row.getCell(2).value).toBe("");
+  });
+
+  it("never puts the admin-only notes in the workbook", () => {
+    // These are hidden from the consultant in the database. A spreadsheet gets
+    // forwarded and printed, so putting them here would quietly undo that.
+    const sheet = wb.getWorksheet("Coaching")!;
+    const headers = (sheet.getRow(1).values as (string | undefined)[]).filter(
+      Boolean,
+    );
+    expect(headers.join(" ")).not.toMatch(/note/i);
+
+    let found = "";
+    sheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        if (typeof cell.value === "string") found += cell.value;
+      });
+    });
+    expect(found).not.toMatch(/pulling their weight/i);
   });
 
   it("writes the Daily Team Summary columns the specification asks for", () => {
@@ -297,9 +381,10 @@ describe("monthly workbook", () => {
         targetRows: [],
         complianceRows: [],
         caseMixRows: [],
+        coachingRows: [],
       }),
     );
-    expect(empty.worksheets).toHaveLength(6);
+    expect(empty.worksheets).toHaveLength(7);
     for (const sheet of empty.worksheets) {
       // Header row only.
       expect(sheet.rowCount).toBeLessThanOrEqual(1);

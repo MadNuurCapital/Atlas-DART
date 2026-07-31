@@ -95,7 +95,7 @@ Two devices, or two browsers.
 - [ ] A blank cell, not a zero, where someone has no target.
 - [ ] **Reconcile by hand:** total the Active GR column and compare it with the dashboard for the same month. They must match exactly.
 - [ ] Export for a single consultant contains only that person.
-- [ ] Export a month with no data — six sheets, headers only, no crash.
+- [ ] Export a month with no data — seven sheets, headers only, no crash.
 
 ## Reminders
 
@@ -135,3 +135,19 @@ Do this with `dryRun=true` first.
 - [ ] Approved for the team by: ______________  Date: __________
 
 Anything that fails goes back as a bug, not as a note. A checklist with unticked boxes is not a passed checklist.
+
+## Private coaching
+
+- [ ] Book a session for a consultant. It appears on **their** dashboard.
+- [ ] Sign in as a different consultant. It is **not** there.
+- [ ] The time on the card is the time you set, in Singapore terms.
+- [ ] Tap **Got it**. The admin list shows it acknowledged.
+- [ ] Move the session. The acknowledgement clears and they are notified again.
+- [ ] Cancel it with a reason. They see the reason; it leaves their upcoming.
+- [ ] Mark one completed. It disappears from the consultant's view entirely.
+- [ ] Reopen it. It comes back as scheduled.
+- [ ] As a consultant, request coaching. Both admins see it waiting.
+- [ ] Decline the request with a reason. The consultant is told why.
+- [ ] Write internal notes. Confirm they appear nowhere on the consultant's side.
+- [ ] Book for three people at once, each at a different time. Three sessions.
+- [ ] Export the month. The Coaching sheet lists them, with no notes column.

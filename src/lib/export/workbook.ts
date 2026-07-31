@@ -33,6 +33,26 @@ export type ExportData = {
   targetRows: TargetRow[];
   complianceRows: ComplianceRow[];
   caseMixRows: CaseMixRow[];
+  coachingRows: CoachingRow[];
+};
+
+/**
+ * One coaching session, for the monthly meeting.
+ *
+ * Internal and outcome notes are deliberately absent. They are admin-only in
+ * the database, and a spreadsheet gets forwarded, printed and left on desks -
+ * putting them here would quietly undo that.
+ */
+export type CoachingRow = {
+  /** ISO instant, or null for a request with no time yet. */
+  scheduledAt: string | null;
+  consultant: string;
+  coach: string | null;
+  category: string;
+  title: string;
+  status: string;
+  acknowledged: boolean;
+  location: string | null;
 };
 
 export type DailyRow = {
@@ -398,6 +418,49 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
     mix.addRow(record);
   }
   autoFilter(mix);
+
+  // ---- 7. Coaching ------------------------------------------------------
+  const coaching = addSheet(wb, "Coaching", [
+    {
+      header: "Date",
+      key: "date",
+      width: 12,
+      style: { numFmt: EXCEL_DATE_FORMAT },
+    },
+    { header: "Time", key: "time", width: 10 },
+    { header: "Consultant", key: "consultant", width: 22 },
+    { header: "Coach", key: "coach", width: 22 },
+    { header: "Category", key: "category", width: 16 },
+    { header: "Title", key: "title", width: 28 },
+    { header: "Status", key: "status", width: 12 },
+    { header: "Acknowledged", key: "acknowledged", width: 14 },
+    { header: "Location", key: "location", width: 22 },
+  ]);
+
+  for (const row of data.coachingRows) {
+    // Written through the same Singapore wall-clock conversion the rest of the
+    // workbook uses: a real date cell so the meeting can sort and filter on it,
+    // and one that reads as the time the session actually was rather than as
+    // its UTC instant.
+    const wall = toSgWallClock(row.scheduledAt);
+
+    coaching.addRow({
+      date: wall,
+      time: wall
+        ? `${String(wall.getUTCHours()).padStart(2, "0")}:${String(
+            wall.getUTCMinutes(),
+          ).padStart(2, "0")}`
+        : "",
+      consultant: row.consultant,
+      coach: row.coach ?? "",
+      category: row.category,
+      title: row.title,
+      status: row.status,
+      acknowledged: row.acknowledged ? "Yes" : "No",
+      location: row.location ?? "",
+    });
+  }
+  autoFilter(coaching);
 
   return wb;
 }

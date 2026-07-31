@@ -3,6 +3,8 @@ import Link from "next/link";
 import { CircleCheck, CircleAlert, ArrowRight } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { unwrap } from "@/lib/query";
+import { fetchMyCoaching } from "@/lib/coaching";
+import { CoachingCard } from "@/components/coaching/coaching-card";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,8 +52,8 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  const [todayRes, monthRes, targetRes, pendingRes, mixRes] = await Promise.all(
-    [
+  const [todayRes, monthRes, targetRes, pendingRes, mixRes, coaching] =
+    await Promise.all([
       supabase
         .from("v_daily_consultant_summary")
         .select("*")
@@ -80,8 +82,10 @@ export default async function DashboardPage() {
         .eq("consultant_id", profile.id)
         .eq("year", year)
         .eq("month", month),
-    ],
-  );
+      // Throws on a failed read rather than rendering as "no coaching booked",
+      // which would look identical to genuinely having none.
+      fetchMyCoaching(supabase),
+    ]);
 
   // A failed read must not render as a zero. Showing S$0 to someone who has
   // written business this month is worse than an error screen, because they
@@ -184,6 +188,8 @@ export default async function DashboardPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <CoachingCard sessions={coaching} />
 
       <TargetPanel
         target={(targetRow as TargetShortfall | null) ?? null}

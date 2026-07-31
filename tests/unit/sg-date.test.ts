@@ -1,19 +1,21 @@
 import { describe, it, expect } from "vitest";
 import {
-  sgToday,
-  toSgDateString,
-  sgDeadline,
-  isOnTime,
   addDays,
-  daysBetween,
-  isWithinEditWindow,
-  daysInMonth,
-  requiredDaysInMonth,
   businessDatesInMonth,
-  monthBounds,
-  parseBusinessDate,
+  daysBetween,
+  daysInMonth,
+  describeWhen,
   formatSgDate,
   formatSgTime,
+  isOnTime,
+  isWithinEditWindow,
+  monthBounds,
+  parseBusinessDate,
+  requiredDaysInMonth,
+  sgDateTimeToInstant,
+  sgDeadline,
+  sgToday,
+  toSgDateString,
 } from "@/lib/sg-date";
 
 describe("Singapore business date", () => {
@@ -161,5 +163,76 @@ describe("display formatting", () => {
   it("formats a time in Singapore, not UTC", () => {
     // 15:30 UTC is 23:30 in Singapore.
     expect(formatSgTime(new Date("2026-07-28T15:30:00Z"))).toMatch(/11:30/);
+  });
+});
+
+describe("turning a form's date and time into an instant", () => {
+  it("reads the time as Singapore, not as the server's timezone", () => {
+    // 2pm in Singapore is 6am UTC. If this were interpreted locally on a
+    // Netlify function in us-east-1, the session would be stored eleven hours
+    // out and every reminder would fire on the wrong day.
+    const at = sgDateTimeToInstant("2026-08-05", "14:00");
+    expect(at?.toISOString()).toBe("2026-08-05T06:00:00.000Z");
+  });
+
+  it("handles a morning session", () => {
+    const at = sgDateTimeToInstant("2026-08-05", "09:30");
+    expect(at?.toISOString()).toBe("2026-08-05T01:30:00.000Z");
+  });
+
+  it("crosses back over the UTC date boundary before 8am", () => {
+    // 7am Singapore is 11pm UTC the PREVIOUS day - the boundary that catches
+    // every naive date implementation.
+    const at = sgDateTimeToInstant("2026-08-05", "07:00");
+    expect(at?.toISOString()).toBe("2026-08-04T23:00:00.000Z");
+  });
+
+  it("round-trips back to the same wall clock", () => {
+    const at = sgDateTimeToInstant("2026-12-31", "23:45");
+    expect(toSgDateString(at!)).toBe("2026-12-31");
+    expect(formatSgTime(at!)).toMatch(/11:45/);
+  });
+
+  it("refuses malformed input rather than returning an invalid date", () => {
+    // Month 13 would otherwise roll over into January 2027 rather than fail.
+    expect(sgDateTimeToInstant("2026-13-01", "10:00")).toBeNull();
+    // 31 February would roll into March.
+    expect(sgDateTimeToInstant("2026-02-31", "10:00")).toBeNull();
+    expect(sgDateTimeToInstant("05/08/2026", "10:00")).toBeNull();
+    expect(sgDateTimeToInstant("2026-08-05", "2pm")).toBeNull();
+    expect(sgDateTimeToInstant("2026-08-05", "25:00")).toBeNull();
+    expect(sgDateTimeToInstant("2026-08-05", "10:71")).toBeNull();
+  });
+});
+
+describe("describing when something is", () => {
+  const now = new Date("2026-08-05T02:00:00Z"); // 10am Singapore
+
+  it("says Today for later the same day", () => {
+    const at = sgDateTimeToInstant("2026-08-05", "14:00")!;
+    expect(describeWhen(at, now)).toMatch(/^Today at /);
+  });
+
+  it("says Tomorrow for the next calendar day", () => {
+    const at = sgDateTimeToInstant("2026-08-06", "09:00")!;
+    expect(describeWhen(at, now)).toMatch(/^Tomorrow at /);
+  });
+
+  it("says Tomorrow late at night, not 'in 10 hours'", () => {
+    // 11pm Singapore, session at 9am the next morning. Under 24 hours away,
+    // but the word people expect is still "tomorrow".
+    const lateTonight = new Date("2026-08-05T15:00:00Z");
+    const at = sgDateTimeToInstant("2026-08-06", "09:00")!;
+    expect(describeWhen(at, lateTonight)).toMatch(/^Tomorrow at /);
+  });
+
+  it("names the weekday within the week", () => {
+    const at = sgDateTimeToInstant("2026-08-08", "14:00")!;
+    expect(describeWhen(at, now)).toMatch(/^Saturday at /);
+  });
+
+  it("falls back to a full date further out", () => {
+    const at = sgDateTimeToInstant("2026-09-20", "14:00")!;
+    expect(describeWhen(at, now)).toMatch(/Sept? 2026 at /);
   });
 });

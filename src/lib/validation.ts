@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   APPOINTMENT_TYPES,
   CAMPAIGN_STATUSES,
+  COACHING_CATEGORIES,
   POLICY_TYPES,
 } from "@/lib/constants";
 import { EDIT_WINDOW_DAYS, isWithinEditWindow, sgToday } from "@/lib/sg-date";
@@ -170,3 +171,85 @@ export function fieldErrors<T>(
   }
   return out;
 }
+
+/**
+ * A coaching session an admin is booking.
+ *
+ * scheduledAt arrives as the two halves a phone actually offers - a date input
+ * and a time input - and is turned into an instant by the action, which is the
+ * only place that knows Singapore is UTC+8. Validating the halves separately
+ * gives a usable error on the field the person got wrong.
+ */
+export const coachingSessionSchema = z.object({
+  consultantId: z.string().uuid({ message: "Choose who this is for" }),
+  coachId: z.string().uuid().nullable().optional(),
+  title: z
+    .string()
+    .trim()
+    .min(2, "Give the session a title")
+    .max(200, "That title is too long"),
+  category: z.enum(COACHING_CATEGORIES, { message: "Choose a category" }),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
+  time: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "Choose a time"),
+  location: z.string().trim().max(200).optional(),
+  message: z.string().trim().max(1000).optional(),
+  agenda: z.string().trim().max(4000).optional(),
+});
+
+export type CoachingSessionInput = z.infer<typeof coachingSessionSchema>;
+
+/**
+ * One line of a bulk booking: who, and at what time on the shared date.
+ *
+ * Twenty monthly reviews is twenty of these against one date and category.
+ */
+export const coachingSlotSchema = z.object({
+  consultantId: z.string().uuid({ message: "Choose who this is for" }),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "Choose a time"),
+});
+
+export const coachingBulkSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(2, "Give the sessions a title")
+    .max(200, "That title is too long"),
+  category: z.enum(COACHING_CATEGORIES, { message: "Choose a category" }),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
+  coachId: z.string().uuid().nullable().optional(),
+  location: z.string().trim().max(200).optional(),
+  message: z.string().trim().max(1000).optional(),
+  slots: z
+    .array(coachingSlotSchema)
+    .min(1, "Add at least one person")
+    .refine(
+      (slots) => new Set(slots.map((s) => s.consultantId)).size === slots.length,
+      { message: "Each person can only appear once" },
+    ),
+});
+
+export type CoachingBulkInput = z.infer<typeof coachingBulkSchema>;
+
+/** What a consultant sends when asking for coaching. */
+export const coachingRequestSchema = z.object({
+  topic: z
+    .string()
+    .trim()
+    .min(5, "Say briefly what you would like coaching on")
+    .max(2000, "That is too long"),
+  category: z.enum(COACHING_CATEGORIES, { message: "Choose a category" }),
+});
+
+/** Cancelling or declining. A refusal with no reason is worse than no record. */
+export const coachingCancelSchema = z.object({
+  sessionId: z.string().uuid(),
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Give a reason")
+    .max(1000, "That reason is too long"),
+});

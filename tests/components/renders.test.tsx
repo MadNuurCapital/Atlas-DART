@@ -48,6 +48,20 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
+vi.mock("@/app/(app)/admin/coaching/actions", () => ({
+  createCoaching: vi.fn(),
+  createCoachingBulk: vi.fn(),
+  scheduleCoaching: vi.fn(),
+  cancelCoaching: vi.fn(),
+  setCoachingOutcome: vi.fn(),
+  saveCoachingNotes: vi.fn(),
+}));
+
+vi.mock("@/app/(app)/coaching/actions", () => ({
+  requestCoaching: vi.fn(),
+  acknowledgeCoaching: vi.fn(),
+}));
+
 vi.mock("@/app/login/actions", () => ({
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -300,6 +314,62 @@ describe("every client component mounts without throwing", () => {
       "@/app/auth/callback/callback-handler"
     );
     expect(() => render(<CallbackHandler />)).not.toThrow();
+  });
+
+  it("the admin coaching manager", async () => {
+    const { CoachingManager } = await import(
+      "@/components/admin/coaching-manager"
+    );
+    expect(() =>
+      render(
+        <CoachingManager
+          rows={[
+            {
+              id: "11111111-1111-4111-8111-111111111111",
+              consultant_id: "22222222-2222-4222-8222-222222222222",
+              coach_id: null,
+              title: "Monthly review",
+              category: "monthly_review",
+              message: null,
+              location: "Office",
+              requested_topic: null,
+              agenda: null,
+              scheduled_at: "2026-08-07T06:00:00Z",
+              status: "scheduled",
+              acknowledged_at: null,
+              cancelled_at: null,
+              cancellation_reason: null,
+              created_at: "2026-08-01T00:00:00Z",
+              consultant_name: "Nur Aisyah",
+              coach_name: "Director",
+              internal_notes: null,
+              outcome_notes: null,
+            },
+          ]}
+          team={[
+            {
+              id: "22222222-2222-4222-8222-222222222222",
+              fullName: "Nur Aisyah",
+              role: "consultant",
+            },
+            {
+              id: "66666666-6666-4666-8666-666666666666",
+              fullName: "Director",
+              role: "admin",
+            },
+          ]}
+        />,
+      ),
+    ).not.toThrow();
+  });
+
+  it("the admin coaching manager with nothing booked", async () => {
+    const { CoachingManager } = await import(
+      "@/components/admin/coaching-manager"
+    );
+    expect(() =>
+      render(<CoachingManager rows={[]} team={[]} />),
+    ).not.toThrow();
   });
 
   it("the error screen", async () => {

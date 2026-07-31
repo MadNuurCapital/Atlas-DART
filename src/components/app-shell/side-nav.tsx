@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  CalendarCheck,
-  Users,
   Briefcase,
+  Building2,
+  CalendarCheck,
+  Download,
+  GraduationCap,
   History,
+  LayoutDashboard,
+  ScrollText,
   Shield,
   Table2,
   Target,
-  Download,
-  Building2,
   UserCog,
-  ScrollText,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
@@ -31,6 +32,7 @@ const ADMIN_ITEMS = [
   { href: "/admin", label: "Team overview", icon: Shield },
   { href: "/admin/daily", label: "Daily board", icon: Table2 },
   { href: "/admin/cases", label: "All cases", icon: Briefcase },
+  { href: "/admin/coaching", label: "Coaching", icon: GraduationCap },
   { href: "/admin/targets", label: "Targets", icon: Target },
   { href: "/admin/users", label: "People", icon: UserCog },
   { href: "/admin/insurers", label: "Insurers", icon: Building2 },

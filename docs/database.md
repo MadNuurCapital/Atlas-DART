@@ -20,6 +20,10 @@ PostgreSQL via Supabase. Migrations in `supabase/migrations/`, applied in filena
 | `0014_push_subscriptions.sql` | Devices subscribed to notifications, with their failure counts |
 | `0015_reminder_types.sql` | Widens `reminder_type` to allow `push_<hour>` |
 | `0016_admin_digest_push.sql` | Adds `admin_digest_push`, so the 6am list logs its notification separately from its email |
+| `0017_no_unsubmitting.sql` | Refuses to turn a submitted day back into a draft |
+| `0018_coaching_sessions.sql` | Private coaching, its triggers and its RLS |
+| `0019_coaching_notes.sql` | Admin-only coaching notes, in their own table so RLS can hide them |
+| `0020_coaching_reminders_sent.sql` | Coaching notification bookkeeping, keyed by session |
 
 Every migration is re-runnable. Applying the whole set to a database that
 already has some of it is a no-op rather than an error - triggers and policies

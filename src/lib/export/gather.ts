@@ -3,7 +3,13 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { monthBounds, formatSgDate } from "@/lib/sg-date";
 import type { ExportData } from "@/lib/export/workbook";
-import type { PolicyType } from "@/lib/constants";
+import {
+  COACHING_CATEGORY_LABELS,
+  COACHING_STATUS_LABELS,
+  type CoachingCategory,
+  type CoachingStatus,
+  type PolicyType,
+} from "@/lib/constants";
 import type {
   DailyConsultantSummary,
   MonthlyComplianceRow,
@@ -43,6 +49,7 @@ export async function gatherExportData(opts: {
     complianceRes,
     mixRes,
     profileRes,
+    coachingRes,
   ] = await Promise.all([
     scoped(
       supabase
@@ -85,6 +92,20 @@ export async function gatherExportData(opts: {
       "consultant_id",
     ),
     supabase.from("profiles").select("id, full_name"),
+    // Coaching for the month. Notes are NOT selected: they are admin-only in
+    // the database and a spreadsheet gets forwarded and printed.
+    scoped(
+      supabase
+        .from("coaching_sessions")
+        .select(
+          `id, consultant_id, coach_id, title, category, status, scheduled_at,
+           acknowledged_at, location`,
+        )
+        .gte("scheduled_at", `${start}T00:00:00+08:00`)
+        .lte("scheduled_at", `${end}T23:59:59.999+08:00`)
+        .order("scheduled_at", { ascending: true }),
+      "consultant_id",
+    ),
   ]);
 
   // A failed read must not become an empty sheet.
@@ -103,6 +124,7 @@ export async function gatherExportData(opts: {
     ["compliance", complianceRes],
     ["the category mix", mixRes],
     ["consultant names", profileRes],
+    ["coaching", coachingRes],
   ] as const) {
     if (result.error) {
       throw new Error(`Export could not read ${what}: ${result.error.message}`);
@@ -265,5 +287,30 @@ export async function gatherExportData(opts: {
       ape: Number(r.ape),
       gr: Number(r.gr),
     })),
+
+    coachingRows: (
+      (coachingRes.data as unknown as CoachingExportRow[]) ?? []
+    ).map((r) => ({
+      scheduledAt: r.scheduled_at,
+      consultant: names.get(r.consultant_id) ?? "",
+      coach: r.coach_id ? (names.get(r.coach_id) ?? null) : null,
+      category: COACHING_CATEGORY_LABELS[r.category] ?? r.category,
+      title: r.title,
+      status: COACHING_STATUS_LABELS[r.status] ?? r.status,
+      acknowledged: r.acknowledged_at !== null,
+      location: r.location,
+    })),
   };
 }
+
+type CoachingExportRow = {
+  id: string;
+  consultant_id: string;
+  coach_id: string | null;
+  title: string;
+  category: CoachingCategory;
+  status: CoachingStatus;
+  scheduled_at: string | null;
+  acknowledged_at: string | null;
+  location: string | null;
+};

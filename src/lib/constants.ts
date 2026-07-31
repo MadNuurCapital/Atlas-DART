@@ -81,6 +81,17 @@ export const AUDIT_ACTIONS = [
   "user_role_changed",
   "user_deactivated",
   "user_reactivated",
+  "coaching_created",
+  "coaching_requested",
+  "coaching_scheduled",
+  "coaching_updated",
+  "coaching_rescheduled",
+  "coaching_cancelled",
+  "coaching_declined",
+  "coaching_completed",
+  "coaching_reopened",
+  "coaching_missed",
+  "coaching_acknowledged",
 ] as const;
 
 /** Plain-English descriptions for the audit trail screen. */
@@ -99,6 +110,17 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   user_role_changed: "Changed a role",
   user_deactivated: "Deactivated an account",
   user_reactivated: "Reactivated an account",
+  coaching_created: "Booked a coaching session",
+  coaching_requested: "Requested coaching",
+  coaching_scheduled: "Scheduled a requested session",
+  coaching_updated: "Edited a coaching session",
+  coaching_rescheduled: "Moved a coaching session",
+  coaching_cancelled: "Cancelled a coaching session",
+  coaching_declined: "Declined a coaching request",
+  coaching_completed: "Completed a coaching session",
+  coaching_reopened: "Reopened a coaching session",
+  coaching_missed: "Marked coaching as missed",
+  coaching_acknowledged: "Acknowledged a coaching session",
 };
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -132,6 +154,55 @@ export function formatCurrency(value: number | null | undefined): string {
  * monthly export aggregate in Postgres and are not capped.
  */
 export const CASE_PAGE_LIMIT = 1000;
+
+/**
+ * Coaching categories.
+ *
+ * The vocabulary the team already uses for reviews, plus one for coaching that
+ * is not on a review cycle. Fixed values rather than free text, so counting
+ * them later is possible - the same reason policy types are a check constraint
+ * and insurers are not.
+ */
+export const COACHING_CATEGORIES = [
+  "monthly_review",
+  "mid_year_review",
+  "yearly_review",
+  "ad_hoc",
+] as const;
+export type CoachingCategory = (typeof COACHING_CATEGORIES)[number];
+
+export const COACHING_CATEGORY_LABELS: Record<CoachingCategory, string> = {
+  monthly_review: "Monthly Review",
+  mid_year_review: "Mid-Year Review",
+  yearly_review: "Yearly Review",
+  ad_hoc: "Ad-hoc",
+};
+
+/**
+ * Where a session is in its life.
+ *
+ * 'requested' is a consultant asking; it carries no time until an admin
+ * schedules it. 'declined' is kept apart from 'cancelled' so that saying no to
+ * a request does not read as calling off a booked meeting.
+ */
+export const COACHING_STATUSES = [
+  "requested",
+  "scheduled",
+  "completed",
+  "cancelled",
+  "declined",
+  "missed",
+] as const;
+export type CoachingStatus = (typeof COACHING_STATUSES)[number];
+
+export const COACHING_STATUS_LABELS: Record<CoachingStatus, string> = {
+  requested: "Requested",
+  scheduled: "Scheduled",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  declined: "Declined",
+  missed: "Missed",
+};
 
 /** Excel number formats. Kept here so the export and the UI cannot drift. */
 export const EXCEL_CURRENCY_FORMAT = '"S$"#,##0.00';

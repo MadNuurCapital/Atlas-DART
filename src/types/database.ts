@@ -14,6 +14,8 @@ import type {
   AppointmentType,
   CampaignStatus,
   CaseStatus,
+  CoachingCategory,
+  CoachingStatus,
   PolicyType,
   ReminderType,
   Role,
@@ -117,6 +119,61 @@ export type PushSubscription = {
   failure_count: number;
   created_at: string;
   last_used_at: string | null;
+};
+
+/**
+ * A private coaching session.
+ *
+ * Internal and outcome notes are deliberately NOT on this type: they live in
+ * coaching_notes, which a consultant has no policy on at all. Row Level
+ * Security grants whole rows, so a note kept here would be readable by the
+ * person it is about.
+ */
+export type CoachingSession = Timestamps & {
+  id: string;
+  /** The person being coached. */
+  consultant_id: string;
+  /** The admin running it. Null on a request nobody has picked up yet. */
+  coach_id: string | null;
+  created_by: string;
+  title: string;
+  category: CoachingCategory;
+  message: string | null;
+  location: string | null;
+  /** What the consultant asked to be coached on. */
+  requested_topic: string | null;
+  /** What the admin plans to cover. Both are visible to both. */
+  agenda: string | null;
+  /** Null while the status is 'requested'. */
+  scheduled_at: string | null;
+  status: CoachingStatus;
+  acknowledged_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+};
+
+/** Admin-only. Never sent to the consultant the notes are about. */
+export type CoachingNotes = Timestamps & {
+  session_id: string;
+  internal_notes: string | null;
+  outcome_notes: string | null;
+};
+
+export type CoachingReminderKind =
+  | "assigned"
+  | "day_before"
+  | "morning_of"
+  | "rescheduled"
+  | "cancelled";
+
+export type CoachingReminderSent = {
+  id: string;
+  session_id: string;
+  kind: CoachingReminderKind;
+  status: "sent" | "failed";
+  error_message: string | null;
+  sent_at: string;
 };
 
 export type ReminderLog = {
@@ -308,6 +365,43 @@ export type Database = {
           | "cancelled_at"
         >;
         Update: Partial<Case>;
+        Relationships: [];
+      };
+      coaching_sessions: {
+        Row: CoachingSession;
+        Insert: InsertOf<
+          CoachingSession,
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "coach_id"
+          | "message"
+          | "location"
+          | "requested_topic"
+          | "agenda"
+          | "scheduled_at"
+          | "status"
+          | "acknowledged_at"
+          | "completed_at"
+          | "cancelled_at"
+          | "cancellation_reason"
+        >;
+        Update: Partial<CoachingSession>;
+        Relationships: [];
+      };
+      coaching_notes: {
+        Row: CoachingNotes;
+        Insert: InsertOf<
+          CoachingNotes,
+          "created_at" | "updated_at" | "internal_notes" | "outcome_notes"
+        >;
+        Update: Partial<CoachingNotes>;
+        Relationships: [];
+      };
+      coaching_reminders_sent: {
+        Row: CoachingReminderSent;
+        Insert: InsertOf<CoachingReminderSent, "id" | "sent_at" | "error_message">;
+        Update: Partial<CoachingReminderSent>;
         Relationships: [];
       };
       push_subscriptions: {

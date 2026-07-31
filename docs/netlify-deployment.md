@@ -63,6 +63,7 @@ Declared in the function files themselves via `export const config = { schedule 
 | `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | VAPID keys |
 | `reminder-consultants` | `0 13 * * *` | 21:00 | Resend — skips itself without it |
 | `reminder-admin-digest` | `0 22 * * *` | 06:00 | VAPID keys; Resend optional |
+| `coaching-reminders` | `0 0,11 * * *` | 08:00 and 19:00 | VAPID keys |
 
 They appear under **Functions** after the first deploy. See [`reminder-function.md`](reminder-function.md) for how to test them before letting the crons run unattended — **Netlify Dev does not fire crons**.
 
@@ -71,8 +72,9 @@ They appear under **Functions** after the first deploy. See [`reminder-function.
 1. Sign in as an admin.
 2. Submit a day as a consultant on a real phone; confirm it appears on `/admin/daily` **without refreshing** — that exercises Realtime, which is the piece most likely to be misconfigured.
 3. Add a case, check GR moves on the dashboard, cancel it, check GR drops and the row survives.
-4. Download a monthly export and confirm six sheets with real numeric cells.
-5. Trigger both reminder functions with `dryRun=true` and check the names are who you expect.
+4. Download a monthly export and confirm seven sheets with real numeric cells.
+5. Trigger the reminder functions with `dryRun=true` and check the names are who you expect.
+6. Book a coaching session for yourself and confirm it appears on your dashboard and nowhere else.
 
 ## Rollback
 

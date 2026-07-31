@@ -712,6 +712,11 @@ function Row({
     row.status,
   );
 
+  // Only a session that has a time can have happened. A pending request has
+  // none, so Complete and Missed are meaningless there - and the database
+  // refuses them outright, which used to surface as an unexplained failure.
+  const canClose = row.status === "scheduled";
+
   return (
     <Card>
       <CardContent className="space-y-3 p-4">
@@ -775,26 +780,32 @@ function Row({
               >
                 {row.status === "requested" ? "Schedule" : "Edit"}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => outcome("completed")}
-              >
-                <Check aria-hidden="true" />
-                Complete
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => outcome("missed")}
-              >
-                <UserX aria-hidden="true" />
-                Missed
-              </Button>
+              {canClose && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    data-testid="complete-coaching"
+                    onClick={() => outcome("completed")}
+                  >
+                    <Check aria-hidden="true" />
+                    Complete
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    data-testid="missed-coaching"
+                    onClick={() => outcome("missed")}
+                  >
+                    <UserX aria-hidden="true" />
+                    Missed
+                  </Button>
+                </>
+              )}
               <Button
                 type="button"
                 size="sm"

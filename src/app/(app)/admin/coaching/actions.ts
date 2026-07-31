@@ -391,7 +391,12 @@ export async function cancelCoaching(
       status: declining ? "declined" : "cancelled",
       cancelled_at: new Date().toISOString(),
       cancellation_reason: parsed.data.reason,
+      // Both cleared deliberately. A cancelled session did not happen, so it
+      // carries no completion time; and confirming a meeting that was then
+      // called off acknowledges nothing. Leaving either behind also trips the
+      // constraints that keep those states coherent.
       acknowledged_at: null,
+      completed_at: null,
     })
     .eq("id", parsed.data.sessionId)
     .select("id, consultant_id")
@@ -454,12 +459,23 @@ export async function setCoachingOutcome(
 
   const { data: before } = await supabase
     .from("coaching_sessions")
-    .select("status")
+    .select("status, scheduled_at")
     .eq("id", sessionId)
     .maybeSingle();
 
   if (!before) {
     return { ok: false, message: "That session could not be found." };
+  }
+
+  // Only a session with a time can have happened or been missed. The database
+  // enforces this too, but a check constraint surfaces as an unexplained
+  // failure - and the useful thing to say is what to do instead.
+  if (outcome !== "reopen" && !before.scheduled_at) {
+    return {
+      ok: false,
+      message:
+        "This is still a request with no time set. Schedule it first, or decline it.",
+    };
   }
 
   const status =

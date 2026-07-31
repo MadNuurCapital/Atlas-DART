@@ -661,6 +661,67 @@ describe("the shape of a session is enforced by the database", () => {
     });
   });
 
+  it("refuses to complete a request that has no time yet", async () => {
+    // Reachable from the admin list: Complete and Missed used to be offered on
+    // a pending request, and both failed with an unexplained error.
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      await asOwner(c);
+      const {
+        rows: [row],
+      } = await c.query<{ id: string }>(
+        `insert into public.coaching_sessions
+           (consultant_id, created_by, title, category, status, requested_topic)
+         values ($1, $1, 'Coaching request', 'ad_hoc', 'requested', 'Closing')
+         returning id`,
+        [consultant.id],
+      );
+
+      await expectRejection(() =>
+        c.query(
+          "update public.coaching_sessions set status = 'completed', completed_at = now() where id = $1",
+          [row!.id],
+        ),
+      );
+    });
+  });
+
+  it("lets a cancelled session drop its completion time", async () => {
+    // Cancelling something already completed has to clear completed_at, or the
+    // row is left in a state the constraints refuse.
+    await withRollback(async (c) => {
+      const consultant = await seedUser(c);
+      const admin = await seedUser(c, { role: "admin" });
+      await asOwner(c);
+      const {
+        rows: [row],
+      } = await c.query<{ id: string }>(
+        `insert into public.coaching_sessions
+           (consultant_id, created_by, title, category, status, scheduled_at, completed_at)
+         values ($1, $2, 'Review', 'monthly_review', 'completed',
+                 now() - interval '1 day', now())
+         returning id`,
+        [consultant.id, admin.id],
+      );
+
+      await actAs(c, admin.id);
+      await c.query(
+        `update public.coaching_sessions
+            set status = 'cancelled', cancelled_at = now(),
+                cancellation_reason = 'Recorded by mistake', completed_at = null
+          where id = $1`,
+        [row!.id],
+      );
+
+      await asOwner(c);
+      const { rows } = await c.query<{ status: string }>(
+        "select status from public.coaching_sessions where id = $1",
+        [row!.id],
+      );
+      expect(rows[0]?.status).toBe("cancelled");
+    });
+  });
+
   it("still refuses an acknowledgement on a request", async () => {
     // The guard the constraint was actually for: there is nothing to
     // acknowledge until a time exists.

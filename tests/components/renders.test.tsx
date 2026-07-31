@@ -363,6 +363,78 @@ describe("every client component mounts without throwing", () => {
     ).not.toThrow();
   });
 
+  it("the admin coaching manager offers no Complete on a request", async () => {
+    // A request has no time, so it cannot have happened. Offering Complete
+    // there produced an unexplained database failure.
+    const { CoachingManager } = await import(
+      "@/components/admin/coaching-manager"
+    );
+    const base = {
+      id: "11111111-1111-4111-8111-111111111111",
+      consultant_id: "22222222-2222-4222-8222-222222222222",
+      coach_id: null,
+      title: "Coaching request",
+      category: "ad_hoc",
+      message: null,
+      location: null,
+      requested_topic: "Closing CIS cases",
+      agenda: null,
+      scheduled_at: null,
+      status: "requested",
+      acknowledged_at: null,
+      cancelled_at: null,
+      cancellation_reason: null,
+      created_at: "2026-08-01T00:00:00Z",
+      consultant_name: "Nur Aisyah",
+      coach_name: null,
+      internal_notes: null,
+      outcome_notes: null,
+    };
+
+    const { queryByTestId } = render(
+      <CoachingManager rows={[base]} team={[]} />,
+    );
+
+    expect(queryByTestId("complete-coaching")).not.toBeInTheDocument();
+    expect(queryByTestId("missed-coaching")).not.toBeInTheDocument();
+  });
+
+  it("the admin coaching manager offers Complete on a scheduled session", async () => {
+    const { CoachingManager } = await import(
+      "@/components/admin/coaching-manager"
+    );
+    const { queryByTestId } = render(
+      <CoachingManager
+        rows={[
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            consultant_id: "22222222-2222-4222-8222-222222222222",
+            coach_id: null,
+            title: "Monthly review",
+            category: "monthly_review",
+            message: null,
+            location: null,
+            requested_topic: null,
+            agenda: null,
+            scheduled_at: "2026-08-07T06:00:00Z",
+            status: "scheduled",
+            acknowledged_at: "2026-08-05T02:00:00Z",
+            cancelled_at: null,
+            cancellation_reason: null,
+            created_at: "2026-08-01T00:00:00Z",
+            consultant_name: "Nur Aisyah",
+            coach_name: "Director",
+            internal_notes: null,
+            outcome_notes: null,
+          },
+        ]}
+        team={[]}
+      />,
+    );
+
+    expect(queryByTestId("complete-coaching")).toBeInTheDocument();
+  });
+
   it("the admin coaching manager with nothing booked", async () => {
     const { CoachingManager } = await import(
       "@/components/admin/coaching-manager"

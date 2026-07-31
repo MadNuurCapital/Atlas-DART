@@ -29,7 +29,7 @@ export default async function SetPasswordPage({
     undefined;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-secondary/40 px-4 py-10">
+    <main className="spatial-wash flex min-h-dvh flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
           <Logo />

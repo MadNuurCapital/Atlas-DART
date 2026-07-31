@@ -1,16 +1,21 @@
-# DART & Case Tracker
+# Atlas DART
 
-Mobile-first daily activity and signed-case tracking for **Integrated Barakah Wealth Advisory**.
+**A**dvisor **T**racking, **L**earning **&** **A**ssistance **S**ystem — for **Integrated Barakah Wealth Advisory**.
 
-Consultants submit their daily DART figures from a phone in under two minutes. Management sees the whole team live, without refreshing, and downloads a monthly Excel meeting report that reconciles exactly to the dashboard.
+Advisors submit their daily DART figures from a phone in under two minutes. Management sees the whole team live, without refreshing, and downloads a monthly Excel meeting report that reconciles exactly to the dashboard. Admins book and run one-to-one coaching alongside it.
 
-Replaces the per-consultant `Consultant_XXX.numbers` workbooks.
+Replaces the per-advisor `Consultant_XXX.numbers` workbooks.
+
+> **A note on the word "consultant".** The interface says *Advisor*. The database
+> still stores the role as `consultant`, and every column, view, policy and API
+> field keeps that name. Renaming a live role value would mean rewriting every
+> RLS policy on a system with real users in it, to change a word nobody sees.
 
 ---
 
 ## Status
 
-**All six phases complete.** The MVP is feature-complete and awaiting the client's Supabase, Netlify and Resend accounts.
+**Live in production.** All six build phases plus private coaching are complete and in daily use.
 
 | Phase | Scope | State |
 |---|---|---|

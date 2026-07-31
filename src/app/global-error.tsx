@@ -30,13 +30,13 @@ export default function GlobalError({
           justifyContent: "center",
           margin: 0,
           padding: "1.5rem",
-          background: "#f1f5f7",
-          color: "#4d4d4f",
+          background: "#eef3f8",
+          color: "#0d1b26",
         }}
       >
         <div style={{ maxWidth: "24rem", textAlign: "center" }}>
           <h1 style={{ fontSize: "1.125rem", marginBottom: "0.5rem" }}>
-            DART &amp; Case Tracker could not start
+            Atlas DART could not start
           </h1>
           <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
             Something went wrong before the app could load. Please try again.
@@ -49,7 +49,7 @@ export default function GlobalError({
               padding: "0.75rem 1.25rem",
               fontSize: "1rem",
               color: "#ffffff",
-              background: "#1e7fa6",
+              background: "#0b5a92",
               border: "none",
               borderRadius: "0.5rem",
               cursor: "pointer",

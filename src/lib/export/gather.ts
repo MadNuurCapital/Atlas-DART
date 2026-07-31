@@ -196,7 +196,7 @@ export async function gatherExportData(opts: {
   };
 
   const scopeLabel = consultantId
-    ? (names.get(consultantId) ?? "Consultant")
+    ? (names.get(consultantId) ?? "Advisor")
     : "Whole Team";
 
   return {

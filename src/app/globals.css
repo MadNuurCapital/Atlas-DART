@@ -4,82 +4,138 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
-   Integrated Barakah Wealth Advisory - brand tokens.
+   Atlas DART - brand tokens.
 
-   These four values are sampled by eye from the supplied logo and are the ONLY
-   place brand colour is defined. When the exact hex codes arrive, change them
-   here and the whole application follows. Nothing else hard-codes a colour.
+   Taken from the supplied logo, not estimated: #0B5A92 is the mark and
+   wordmark, #F6CE6F the accent square. This is the ONLY place brand colour is
+   defined, so a rebrand is a change to this block and nothing else.
+
+   Both themes are designed deliberately. There are no `dark:` utilities
+   anywhere in the application - every colour resolves through these variables -
+   which is what lets the whole interface follow the phone's setting from one
+   file.
 --------------------------------------------------------------------------- */
 :root {
-  --brand-blue: #1e7fa6;
-  --brand-blue-deep: #17607e;
-  --brand-orange: #f5a02a;
-  --brand-grey: #4d4d4f;
+  --brand-blue: #0b5a92;
+  --brand-blue-deep: #073f68;
+  --brand-blue-bright: #1c7fc4;
+  --brand-gold: #f6ce6f;
+  --brand-gold-deep: #d9a92f;
+  --brand-ink: #0d1b26;
 
-  --radius: 0.625rem;
+  /* The mark's own blue. #0B5A92 exactly as supplied in light; brightened on
+     dark, where the original goes muddy against near-black. */
+  --logo-blue: #0b5a92;
+  --logo-halo: rgb(11 90 146 / 0.28);
 
-  --background: #ffffff;
-  --foreground: var(--brand-grey);
+  /* Kept as aliases so nothing that referenced the old names breaks. */
+  --brand-orange: var(--brand-gold);
+  --brand-grey: #4d5a63;
+
+  --radius: 0.875rem;
+
+  /* Not pure white. Bento tiles need a surface to sit ON, or they stop reading
+     as separate objects and the whole layout flattens. */
+  --background: #eef3f8;
+  --foreground: var(--brand-ink);
 
   --card: #ffffff;
-  --card-foreground: var(--brand-grey);
+  --card-foreground: var(--brand-ink);
   --popover: #ffffff;
-  --popover-foreground: var(--brand-grey);
+  --popover-foreground: var(--brand-ink);
 
   --primary: var(--brand-blue);
   --primary-foreground: #ffffff;
 
-  --secondary: #f1f5f7;
+  --secondary: #dfe9f2;
   --secondary-foreground: var(--brand-blue-deep);
 
-  --muted: #f1f5f7;
-  --muted-foreground: #6b7280;
+  --muted: #e6edf4;
+  --muted-foreground: #5a6b78;
 
-  --accent: var(--brand-orange);
-  --accent-foreground: #ffffff;
+  --accent: var(--brand-gold);
+  /* Gold is a light colour. Text on it must be dark or it fails contrast. */
+  --accent-foreground: #3d2c00;
 
-  --destructive: #dc2626;
+  --destructive: #d92d20;
   --destructive-foreground: #ffffff;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: var(--brand-blue);
+  --border: #d3e0ec;
+  --input: #cbd9e6;
+  --ring: var(--brand-blue-bright);
 
-  /* Semantic status colours. Office indicator and target state only - these are
-     deliberately NOT brand colours, so they read as status, not decoration. */
-  --status-present: #16a34a;
-  --status-absent: #dc2626;
-  --status-late: #f59e0b;
-  --status-missing: #94a3b8;
+  /* Glass: used on chrome and overlays, never on a surface holding a figure
+     somebody has to read exactly. */
+  --glass-bg: rgb(255 255 255 / 0.72);
+  --glass-bg-strong: rgb(255 255 255 / 0.88);
+  --glass-border: rgb(255 255 255 / 0.9);
+  --glass-shadow: 0 1px 2px rgb(13 27 38 / 0.04), 0 8px 24px -8px rgb(13 27 38 / 0.12);
+  --glass-shadow-lifted: 0 2px 4px rgb(13 27 38 / 0.06), 0 20px 40px -12px rgb(13 27 38 / 0.18);
+
+  /* The spatial wash behind everything - two soft brand-coloured pools. */
+  --wash-one: rgb(28 127 196 / 0.16);
+  --wash-two: rgb(246 206 111 / 0.18);
+
+  /* Semantic status colours. Deliberately NOT brand colours, so they read as
+     status rather than decoration. */
+  --status-present: #12855a;
+  --status-absent: #d92d20;
+  --status-late: #c77700;
+  --status-missing: #8a9aa6;
 }
 
-.dark {
-  --background: #0f1720;
-  --foreground: #e8eef2;
+/*
+  Follows the device. There is no toggle: a person who has set their phone to
+  dark has already answered this question, and asking again in a second place
+  is a setting nobody wants to maintain.
+*/
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #070d14;
+    --foreground: #e6eef5;
 
-  --card: #16212c;
-  --card-foreground: #e8eef2;
-  --popover: #16212c;
-  --popover-foreground: #e8eef2;
+    --card: #101b26;
+    --card-foreground: #e6eef5;
+    --popover: #101b26;
+    --popover-foreground: #e6eef5;
 
-  --primary: #3b9dc4;
-  --primary-foreground: #06202b;
+    /* The logo blue is too dark to read on near-black; brightened for contrast
+       while staying recognisably the same colour. */
+    --primary: #4aa5e0;
+    --primary-foreground: #04121d;
+    --logo-blue: #3f9ad6;
+    --logo-halo: rgb(63 154 214 / 0.42);
 
-  --secondary: #1e2c38;
-  --secondary-foreground: #e8eef2;
+    --secondary: #17242f;
+    --secondary-foreground: #cfe0ee;
 
-  --muted: #1e2c38;
-  --muted-foreground: #9bacb8;
+    --muted: #16222d;
+    --muted-foreground: #93a5b3;
 
-  --accent: var(--brand-orange);
-  --accent-foreground: #2a1a00;
+    --accent: var(--brand-gold);
+    --accent-foreground: #2a1d00;
 
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+    --destructive: #f2645a;
+    --destructive-foreground: #1a0503;
 
-  --border: #26343f;
-  --input: #26343f;
-  --ring: #3b9dc4;
+    --border: #1f2f3c;
+    --input: #24354350;
+    --ring: #4aa5e0;
+
+    --glass-bg: rgb(19 30 41 / 0.62);
+    --glass-bg-strong: rgb(19 30 41 / 0.85);
+    --glass-border: rgb(255 255 255 / 0.08);
+    --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+    --glass-shadow-lifted: 0 2px 4px rgb(0 0 0 / 0.5), 0 24px 48px -12px rgb(0 0 0 / 0.7);
+
+    --wash-one: rgb(28 127 196 / 0.22);
+    --wash-two: rgb(246 206 111 / 0.10);
+
+    --status-present: #35c78a;
+    --status-absent: #f2645a;
+    --status-late: #f0b043;
+    --status-missing: #6c7c88;
+  }
 }
 
 @theme inline {
@@ -105,6 +161,10 @@
 
   --color-brand-blue: var(--brand-blue);
   --color-brand-blue-deep: var(--brand-blue-deep);
+  --color-brand-blue-bright: var(--brand-blue-bright);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-deep: var(--brand-gold-deep);
+  --color-brand-ink: var(--brand-ink);
   --color-brand-orange: var(--brand-orange);
   --color-brand-grey: var(--brand-grey);
 
@@ -149,5 +209,116 @@
   /* Respect the iOS home indicator under the fixed bottom navigation. */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@layer utilities {
+  /* -------------------------------------------------------------------------
+     Glass.
+
+     Deliberately restrained. Blur and translucency go on chrome - navigation,
+     headers, dialogs, the login card - and never on a surface holding a number
+     somebody has to read exactly. A GR figure at 72% opacity over a moving
+     background is a worse product, however good it looks.
+
+     backdrop-filter is also the single most expensive thing on this page for
+     an older phone, so it is applied to a handful of fixed surfaces rather
+     than to every row of a scrolling list.
+  ------------------------------------------------------------------------- */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  }
+
+  .glass-strong {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-lifted);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  }
+
+  .lifted {
+    box-shadow: var(--glass-shadow-lifted);
+  }
+
+  /* -------------------------------------------------------------------------
+     The spatial wash.
+
+     Two soft pools of brand colour behind everything, fixed so they do not
+     travel with the scroll - that stillness is what makes the tiles read as
+     floating above a space rather than printed on a page.
+  ------------------------------------------------------------------------- */
+  .spatial-wash::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60rem 40rem at 8% -8%, var(--wash-one), transparent 60%),
+      radial-gradient(45rem 35rem at 105% 8%, var(--wash-two), transparent 62%);
+  }
+
+  /* A hairline of brand light along the top edge of a hero tile. */
+  .edge-light {
+    position: relative;
+  }
+  .edge-light::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--brand-gold) 30%,
+      var(--brand-blue-bright) 70%,
+      transparent
+    );
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  /* -------------------------------------------------------------------------
+     The mark's halo.
+
+     A drop-shadow rather than an SVG filter, so it follows the silhouette
+     instead of blurring the open centre into a smudge, and so it can be a
+     different colour in each theme. Login screen and empty states only.
+  ------------------------------------------------------------------------- */
+  .logo-glow {
+    filter: drop-shadow(0 0 18px var(--logo-halo))
+      drop-shadow(0 4px 10px rgb(0 0 0 / 0.14));
+  }
+
+  /* Anyone who has asked their device to calm down gets no blur and no motion.
+     The layout carries the design on its own. */
+  @media (prefers-reduced-motion: reduce) {
+    .glass,
+    .glass-strong {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: var(--card);
+    }
+  }
+
+  /* Same for anyone who has asked for more contrast: solid surfaces, hard
+     borders, no translucency to read through. */
+  @media (prefers-contrast: more) {
+    .glass,
+    .glass-strong {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: var(--card);
+      border-color: var(--foreground);
+    }
+    .logo-glow {
+      filter: none;
+    }
   }
 }

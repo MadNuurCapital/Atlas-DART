@@ -28,7 +28,7 @@ export default async function AdminInsurersPage() {
       <div>
         <h1 className="text-lg font-semibold">Insurers</h1>
         <p className="text-sm text-muted-foreground">
-          Consultants add insurers as they need them. Rename one and every
+          Advisors add insurers as they need them. Rename one and every
           existing case follows, because cases reference it by id rather than by
           name.
         </p>

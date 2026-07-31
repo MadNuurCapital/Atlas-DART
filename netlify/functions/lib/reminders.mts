@@ -235,7 +235,9 @@ export function appUrl(): string {
   return (process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
 }
 
-const BRAND_BLUE = "#1e7fa6";
+/* Email clients have no CSS variables, so the one brand colour these templates
+   use is spelled out here. It must match --brand-blue in globals.css. */
+const BRAND_BLUE = "#0b5a92";
 
 export function consultantEmail(name: string, businessDate: string) {
   const firstName = name.split(" ")[0] ?? name;

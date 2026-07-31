@@ -62,9 +62,11 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
           href={href}
           aria-current={active ? "page" : undefined}
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
             active
-              ? "bg-secondary text-secondary-foreground"
+              ? // A left bar rather than a filled pill: at a glance you read
+                // one lit edge instead of scanning nine similar blocks.
+                "bg-primary/10 text-foreground shadow-[inset_2px_0_0_0_var(--primary)]"
               : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
           )}
         >
@@ -76,7 +78,7 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border bg-card md:block">
+    <aside className="glass sticky top-0 hidden h-dvh w-64 shrink-0 overflow-y-auto border-y-0 border-l-0 md:block">
       <div className="p-5">
         <Logo />
       </div>

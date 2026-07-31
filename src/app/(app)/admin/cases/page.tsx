@@ -15,7 +15,7 @@ export default async function AdminCasesPage() {
       <div>
         <h1 className="text-lg font-semibold">All cases</h1>
         <p className="text-sm text-muted-foreground">
-          Every consultant&rsquo;s cases, including cancelled ones. Only you can
+          Every advisor&rsquo;s cases, including cancelled ones. Only you can
           restore a cancelled case.
         </p>
       </div>

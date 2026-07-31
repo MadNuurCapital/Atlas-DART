@@ -103,7 +103,7 @@ function InsurerRow({
               {caseCount === 0
                 ? "No cases"
                 : `${caseCount} case${caseCount === 1 ? "" : "s"}`}
-              {insurer.created_by && " · added by a consultant"}
+              {insurer.created_by && " · added by an advisor"}
             </p>
           </div>
 

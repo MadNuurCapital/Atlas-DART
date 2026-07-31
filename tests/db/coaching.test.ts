@@ -847,3 +847,95 @@ describe("notification bookkeeping", () => {
     });
   });
 });
+
+/**
+ * Every move the admin screen can actually make.
+ *
+ * Three bugs reached real use before this existed, all the same shape: a
+ * transition the buttons offered that a CHECK constraint refused, surfacing as
+ * an unexplained "could not be updated". Each was fixed individually, which is
+ * not the same as knowing there are no more.
+ *
+ * So this walks the state machine rather than sampling it. Each case writes
+ * exactly what the corresponding server action writes - including the columns
+ * it clears - so a constraint that would reject the real update rejects this
+ * too.
+ */
+describe("every transition the admin screen offers actually works", () => {
+  type Move = {
+    from: string;
+    to: string;
+    /** What the action sets, beyond the status itself. */
+    set: string;
+    /** Whether the consultant had acknowledged first. */
+    acknowledged?: boolean;
+  };
+
+  const moves: Move[] = [
+    // Scheduling or declining a request.
+    { from: "requested", to: "scheduled", set: "scheduled_at = now() + interval '1 day'" },
+    { from: "requested", to: "declined", set: "cancelled_at = now(), cancellation_reason = 'Covered already'" },
+
+    // Closing out a scheduled session, with and without an acknowledgement.
+    { from: "scheduled", to: "completed", set: "completed_at = now()" },
+    { from: "scheduled", to: "completed", set: "completed_at = now()", acknowledged: true },
+    { from: "scheduled", to: "missed", set: "completed_at = null" },
+    { from: "scheduled", to: "missed", set: "completed_at = null", acknowledged: true },
+    { from: "scheduled", to: "cancelled", set: "cancelled_at = now(), cancellation_reason = 'Clash', acknowledged_at = null, completed_at = null" },
+    { from: "scheduled", to: "cancelled", set: "cancelled_at = now(), cancellation_reason = 'Clash', acknowledged_at = null, completed_at = null", acknowledged: true },
+
+    // Rescheduling in place.
+    { from: "scheduled", to: "scheduled", set: "scheduled_at = now() + interval '9 days'" },
+    { from: "scheduled", to: "scheduled", set: "scheduled_at = now() + interval '9 days'", acknowledged: true },
+
+    // Reopening.
+    { from: "completed", to: "scheduled", set: "completed_at = null" },
+    { from: "missed", to: "scheduled", set: "completed_at = null" },
+
+    // Correcting a mistake after the fact.
+    { from: "completed", to: "cancelled", set: "cancelled_at = now(), cancellation_reason = 'Recorded by mistake', acknowledged_at = null, completed_at = null" },
+    { from: "missed", to: "completed", set: "completed_at = now()" },
+  ];
+
+  it.each(moves)(
+    "$from -> $to ($acknowledged)",
+    async ({ from, to, set, acknowledged }) => {
+      await withRollback(async (c) => {
+        const consultant = await seedUser(c);
+        const admin = await seedUser(c, { role: "admin" });
+        await asOwner(c);
+
+        // Build a row in the starting state, exactly as the app would hold it.
+        const scheduledAt =
+          from === "requested" ? null : "now() - interval '1 hour'";
+        const completedAt = from === "completed" ? "now()" : "null";
+
+        const {
+          rows: [row],
+        } = await c.query<{ id: string }>(
+          `insert into public.coaching_sessions
+             (consultant_id, created_by, title, category, status,
+              scheduled_at, completed_at, acknowledged_at)
+           values ($1, $2, 'Review', 'monthly_review', $3,
+                   ${scheduledAt ?? "null"}, ${completedAt},
+                   ${acknowledged && from === "scheduled" ? "now()" : "null"})
+           returning id`,
+          [consultant.id, admin.id, from],
+        );
+
+        await actAs(c, admin.id);
+        await c.query(
+          `update public.coaching_sessions set status = $2, ${set} where id = $1`,
+          [row!.id, to],
+        );
+
+        await asOwner(c);
+        const { rows } = await c.query<{ status: string }>(
+          "select status from public.coaching_sessions where id = $1",
+          [row!.id],
+        );
+        expect(rows[0]?.status).toBe(to);
+      });
+    },
+  );
+});

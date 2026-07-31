@@ -251,17 +251,34 @@ export async function updateAppointment(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+
+  // .select() matters here, and is not decoration. Postgres does not raise on
+  // an UPDATE that Row Level Security filters out - the row simply does not
+  // match and the statement succeeds having changed nothing. Checking only
+  // `error` would show "Appointment updated." to someone whose edit was
+  // refused, most plausibly because the day has just aged out of the seven-day
+  // window while they had the page open.
+  const { data, error } = await supabase
     .from("appointment_activities")
     .update({
       prospect_name: parsed.data.prospectName,
       appointment_type: parsed.data.appointmentType,
       note: parsed.data.note?.trim() ? parsed.data.note.trim() : null,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
 
   if (error) {
     return { ok: false, message: "That appointment could not be updated." };
+  }
+
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      message: isWithinEditWindow(parsed.data.businessDate)
+        ? "That appointment could not be found."
+        : "That day is outside the seven-day window and can no longer be changed.",
+    };
   }
 
   revalidatePath("/today");
@@ -279,14 +296,25 @@ export async function deleteAppointment(
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
 
-  // RLS restricts this to the caller's own rows inside the edit window.
-  const { error } = await supabase
+  // RLS restricts this to the caller's own rows inside the edit window - and a
+  // DELETE it filters out succeeds having removed nothing, so the returned
+  // rows are the only way to tell the two apart.
+  const { data, error } = await supabase
     .from("appointment_activities")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
 
   if (error) {
     return { ok: false, message: "That appointment could not be removed." };
+  }
+
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      message:
+        "That appointment could not be removed. The day may be outside the seven-day window.",
+    };
   }
 
   revalidatePath("/today");

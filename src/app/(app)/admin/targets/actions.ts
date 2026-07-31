@@ -54,20 +54,27 @@ export async function setTarget(
     : existingQuery.eq("month", month)
   ).maybeSingle();
 
-  const { error } = existing
+  // .select() on both branches: an UPDATE that Row Level Security filters out
+  // succeeds having changed nothing, so `error` alone would report a target as
+  // saved when it was refused.
+  const { data: written, error } = existing
     ? await supabase
         .from("consultant_targets")
         .update({ gr_target: grTarget })
         .eq("id", existing.id)
-    : await supabase.from("consultant_targets").insert({
-        consultant_id: consultantId,
-        period_type: periodType,
-        year,
-        month,
-        gr_target: grTarget,
-      });
+        .select("id")
+    : await supabase
+        .from("consultant_targets")
+        .insert({
+          consultant_id: consultantId,
+          period_type: periodType,
+          year,
+          month,
+          gr_target: grTarget,
+        })
+        .select("id");
 
-  if (error) {
+  if (error || !written || written.length === 0) {
     return { ok: false, message: "That target could not be saved." };
   }
 
@@ -110,13 +117,16 @@ export async function clearMonthlyOverride(
     .eq("id", id)
     .maybeSingle();
 
-  const { error } = await supabase
+  // A DELETE that Row Level Security filters out removes nothing and reports
+  // success, so the returned rows are what distinguish the two.
+  const { data: removed, error } = await supabase
     .from("consultant_targets")
     .delete()
     .eq("id", id)
-    .eq("period_type", "monthly");
+    .eq("period_type", "monthly")
+    .select("id");
 
-  if (error) {
+  if (error || !removed || removed.length === 0) {
     return { ok: false, message: "That override could not be removed." };
   }
 
@@ -159,16 +169,23 @@ export async function renameInsurer(
     .eq("id", id)
     .maybeSingle();
 
-  const { error } = await supabase
+  const { data: renamed, error } = await supabase
     .from("insurers")
     .update({ name: parsed.data.name })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
 
   if (error) {
     return {
       ok: false,
       message: "Another insurer already uses that name.",
     };
+  }
+
+  // No error but no row: Row Level Security filtered the update out rather
+  // than rejecting it, which succeeds having changed nothing.
+  if (!renamed || renamed.length === 0) {
+    return { ok: false, message: "That insurer could not be renamed." };
   }
 
   await recordAudit(supabase, {
@@ -202,12 +219,13 @@ export async function setInsurerActive(
   const active = String(formData.get("active") ?? "") === "true";
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from("insurers")
     .update({ active })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
 
-  if (error) {
+  if (error || !changed || changed.length === 0) {
     return { ok: false, message: "That insurer could not be updated." };
   }
 

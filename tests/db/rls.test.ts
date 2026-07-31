@@ -645,3 +645,100 @@ describe("the audit trail is readable but not writable", () => {
     });
   });
 });
+
+describe("a refused write is silent, not an error", () => {
+  // Postgres does NOT raise on an UPDATE or DELETE that RLS filters out - the
+  // rows simply do not match, and the statement reports success having changed
+  // nothing. Any server action that checks only `error` therefore reports
+  // "saved" to someone whose change was actually rejected.
+  //
+  // These tests pin that behaviour so the actions are written against what the
+  // database really does rather than what it looks like it should do.
+
+  it("silently changes nothing when RLS filters the row out", async () => {
+    await withRollback(async (c) => {
+      const owner = await seedUser(c);
+      const stranger = await seedUser(c);
+      const today = await sgToday(c);
+
+      await asOwner(c);
+      const {
+        rows: [submission],
+      } = await c.query<{ id: string }>(
+        `insert into public.daily_submissions
+           (user_id, business_date, dials, talked_to, campaign_status, in_office, status)
+         values ($1, $2, 5, 2, 'running', true, 'draft')
+         returning id`,
+        [owner.id, today],
+      );
+      const {
+        rows: [appointment],
+      } = await c.query<{ id: string }>(
+        `insert into public.appointment_activities
+           (daily_submission_id, user_id, business_date, prospect_name, appointment_type)
+         values ($1, $2, $3, 'Ahmad', 'opening')
+         returning id`,
+        [submission!.id, owner.id, today],
+      );
+
+      await actAs(c, stranger.id);
+
+      // No throw - this is the whole point.
+      const updated = await c.query(
+        "update public.appointment_activities set prospect_name = 'Hijacked' where id = $1",
+        [appointment!.id],
+      );
+      expect(updated.rowCount).toBe(0);
+
+      const deleted = await c.query(
+        "delete from public.appointment_activities where id = $1",
+        [appointment!.id],
+      );
+      expect(deleted.rowCount).toBe(0);
+
+      await asOwner(c);
+      const { rows } = await c.query<{ prospect_name: string }>(
+        "select prospect_name from public.appointment_activities where id = $1",
+        [appointment!.id],
+      );
+      expect(rows[0]?.prospect_name).toBe("Ahmad");
+    });
+  });
+
+  it("returns the changed rows when the write is genuinely allowed", async () => {
+    // The fix relies on this: asking for the updated rows back distinguishes
+    // "changed nothing" from "changed something".
+    await withRollback(async (c) => {
+      const owner = await seedUser(c);
+      const today = await sgToday(c);
+
+      await asOwner(c);
+      const {
+        rows: [submission],
+      } = await c.query<{ id: string }>(
+        `insert into public.daily_submissions
+           (user_id, business_date, dials, talked_to, campaign_status, in_office, status)
+         values ($1, $2, 5, 2, 'running', true, 'draft')
+         returning id`,
+        [owner.id, today],
+      );
+      const {
+        rows: [appointment],
+      } = await c.query<{ id: string }>(
+        `insert into public.appointment_activities
+           (daily_submission_id, user_id, business_date, prospect_name, appointment_type)
+         values ($1, $2, $3, 'Ahmad', 'opening')
+         returning id`,
+        [submission!.id, owner.id, today],
+      );
+
+      await actAs(c, owner.id);
+      const updated = await c.query(
+        "update public.appointment_activities set prospect_name = 'Ahmad Bin Ali' where id = $1 returning id",
+        [appointment!.id],
+      );
+
+      expect(updated.rowCount).toBe(1);
+    });
+  });
+});

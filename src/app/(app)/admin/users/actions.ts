@@ -217,12 +217,16 @@ export async function setUserRole(
     }
   }
 
-  const { error } = await supabase
+  // Row Level Security filtering an UPDATE out is not an error - the row just
+  // does not match and the statement succeeds having changed nothing. Asking
+  // for the row back is what separates "changed" from "silently refused".
+  const { data: changed, error } = await supabase
     .from("profiles")
     .update({ role })
-    .eq("id", userId);
+    .eq("id", userId)
+    .select("id");
 
-  if (error) {
+  if (error || !changed || changed.length === 0) {
     return { ok: false, message: "That role could not be changed." };
   }
 
@@ -286,12 +290,13 @@ export async function setUserActive(
     }
   }
 
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from("profiles")
     .update({ active })
-    .eq("id", userId);
+    .eq("id", userId)
+    .select("id");
 
-  if (error) {
+  if (error || !changed || changed.length === 0) {
     return { ok: false, message: "That account could not be updated." };
   }
 

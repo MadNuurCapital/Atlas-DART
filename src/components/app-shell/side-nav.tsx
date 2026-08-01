@@ -80,7 +80,7 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
   return (
     <aside className="glass sticky top-0 hidden h-dvh w-64 shrink-0 overflow-y-auto border-y-0 border-l-0 md:block">
       <div className="p-5">
-        <Logo />
+        <Logo showCompany />
       </div>
       <nav aria-label="Primary" className="px-3 pb-6">
         <ul className="space-y-1">{CONSULTANT_ITEMS.map(renderItem)}</ul>

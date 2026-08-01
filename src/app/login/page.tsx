@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { APP_TAGLINE, LogoMark } from "@/components/brand/logo";
+import { APP_COMPANY, APP_TAGLINE, LogoMark } from "@/components/brand/logo";
 import { LoginForm } from "./login-form";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -27,7 +27,23 @@ export default async function LoginPage({
               DART
             </span>
           </h1>
-          <p className="mt-2 max-w-[19rem] text-xs text-muted-foreground">
+
+          {/* The firm, directly under the name. Same typeface and the same
+              uppercase-and-letterspaced treatment as the wordmark, a step down
+              in size and weight - so it reads as belonging to the lockup
+              rather than as a third competing line. */}
+          <p className="mt-2.5 max-w-[20rem] text-[11px] font-semibold uppercase leading-relaxed tracking-[0.18em] text-[var(--logo-blue)]/70">
+            {APP_COMPANY}
+          </p>
+
+          {/* The rule keeps the tagline from reading as part of the firm's
+              name, which is what three stacked centred lines otherwise does. */}
+          <span
+            aria-hidden="true"
+            className="mt-3 h-px w-10 bg-[var(--logo-blue)]/25"
+          />
+
+          <p className="mt-3 max-w-[19rem] text-xs text-muted-foreground">
             {APP_TAGLINE}
           </p>
         </div>

@@ -61,24 +61,46 @@ export function LogoMark({
 export function Logo({
   className,
   showWordmark = true,
+  showCompany = false,
   glow = false,
 }: {
   className?: string;
   showWordmark?: boolean;
+  /**
+   * Put the firm's name under the lockup. Off by default: at 32px in a header
+   * it would be unreadable, and the people reading it there already know whose
+   * system they are in.
+   */
+  showCompany?: boolean;
   glow?: boolean;
 }) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <LogoMark glow={glow} />
-      {showWordmark && (
-        <div className="leading-none">
-          <div className="text-lg font-bold uppercase tracking-[0.14em] text-[var(--logo-blue)]">
-            Atlas
+    <div className={cn("min-w-0", className)}>
+      <div className="flex items-center gap-3">
+        <LogoMark glow={glow} />
+        {showWordmark && (
+          <div className="leading-none">
+            <div className="text-lg font-bold uppercase tracking-[0.14em] text-[var(--logo-blue)]">
+              Atlas
+            </div>
+            <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.34em] text-[var(--logo-blue)]/75">
+              Dart
+            </div>
           </div>
-          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.34em] text-[var(--logo-blue)]/75">
-            Dart
-          </div>
-        </div>
+        )}
+      </div>
+
+      {/* Under the whole lockup rather than beside the wordmark: the sidebar
+          leaves about 170px next to the mark, and the firm's name does not fit
+          in it without breaking mid-word.
+
+          text-balance evens the two lines. Left to itself the wrap puts
+          "ADVISORY" alone on the second line, which reads as an afterthought
+          rather than as part of the firm's name. */}
+      {showCompany && (
+        <p className="mt-3 text-balance text-[10px] font-medium uppercase leading-relaxed tracking-[0.16em] text-muted-foreground">
+          {APP_COMPANY}
+        </p>
       )}
     </div>
   );
@@ -87,3 +109,5 @@ export function Logo({
 /** The full name, for places that need words rather than artwork. */
 export const APP_NAME = "Atlas DART";
 export const APP_TAGLINE = "Advisor Tracking, Learning & Assistance System";
+/** Whose system this is. Shown under the wordmark, never instead of it. */
+export const APP_COMPANY = "Integrated Barakah Wealth Advisory";

@@ -79,8 +79,16 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <aside className="glass sticky top-0 hidden h-dvh w-64 shrink-0 overflow-y-auto border-y-0 border-l-0 md:block">
+      {/* The mark goes home. It is what people try first, and until now it was
+          the one thing on the page that looked clickable and was not. */}
       <div className="p-5">
-        <Logo showCompany />
+        <Link
+          href="/dashboard"
+          aria-label="Atlas DART — go to your dashboard"
+          className="block rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Logo showCompany />
+        </Link>
       </div>
       <nav aria-label="Primary" className="px-3 pb-6">
         <ul className="space-y-1">{CONSULTANT_ITEMS.map(renderItem)}</ul>

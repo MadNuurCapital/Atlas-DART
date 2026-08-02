@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- DART & Case Tracker - installation health check
+-- Atlas DART - installation health check
 --
 -- Paste into the Supabase SQL editor and run. Read-only: it inspects and
 -- reports, and writes nothing.

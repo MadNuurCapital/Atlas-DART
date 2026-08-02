@@ -48,9 +48,15 @@ export default async function AppLayout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="glass sticky top-0 z-30 flex items-center justify-between gap-3 border-x-0 border-t-0 px-4 py-3">
-          <div className="md:hidden">
+          {/* Same on the phone. -m-1 p-1 gives the tap target some room
+              without moving the mark off the header's optical baseline. */}
+          <Link
+            href="/dashboard"
+            aria-label="Atlas DART — go to your dashboard"
+            className="-m-1 rounded-lg p-1 outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:hidden"
+          >
             <Logo showWordmark={false} />
-          </div>
+          </Link>
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{profile.full_name}</p>

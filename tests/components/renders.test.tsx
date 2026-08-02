@@ -309,6 +309,18 @@ describe("every client component mounts without throwing", () => {
     expect(() => render(<SideNav isAdmin />)).not.toThrow();
   });
 
+  it("the side navigation's mark links home", async () => {
+    const { SideNav } = await import("@/components/app-shell/side-nav");
+    const { getByLabelText } = render(<SideNav isAdmin={false} />);
+
+    // Clicking the logo is the first thing people try. Asserted rather than
+    // eyeballed, because a wrapper that quietly loses its href still looks
+    // exactly right in a screenshot.
+    const home = getByLabelText(/go to your dashboard/i);
+    expect(home.getAttribute("href")).toBe("/dashboard");
+    expect(home.querySelector("svg")).not.toBeNull();
+  });
+
   it("the invitation callback handler", async () => {
     const { CallbackHandler } = await import(
       "@/app/auth/callback/callback-handler"

@@ -14,6 +14,14 @@ import {
 import { formatSgTime } from "@/lib/sg-date";
 import type { TeamDailyRow } from "@/types/database";
 
+/**
+ * How long the board waits for realtime to go quiet before re-fetching.
+ *
+ * Long enough to swallow the burst of writes one person's submission produces,
+ * short enough that an admin watching the screen still reads it as live.
+ */
+const REFRESH_QUIET_MS = 600;
+
 function OfficeDot({ inOffice }: { inOffice: boolean | null }) {
   const cls =
     inOffice === null
@@ -82,15 +90,31 @@ export function TeamBoard({
   // Realtime: refresh the server component when anything that feeds this board
   // changes, so an admin watching the screen sees submissions land without
   // touching anything.
+  //
+  // The refresh is COALESCED, and that matters more than it sounds. One person
+  // filling in their day is not one event: it is a daily_submissions write plus
+  // one appointment_activities write per prospect row, arriving within a second
+  // or two of each other. Refreshing on each of them fired a full server
+  // re-render - every query on this page - ten or more times for a single
+  // submission. Around the 11:59pm deadline, with the whole team submitting at
+  // once, the board spent its time re-fetching rather than painting.
+  //
+  // Waiting for a short quiet gap turns that burst into one refresh. The board
+  // still updates on its own; it just stops doing it ten times over.
   useEffect(() => {
     const supabase = createClient();
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let flashTimer: ReturnType<typeof setTimeout> | undefined;
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
     const bump = () => {
+      // The "updated" flash is immediate: the admin should see that something
+      // landed straight away, even though the data itself arrives a beat later.
       setJustUpdated(true);
-      router.refresh();
-      clearTimeout(timer);
-      timer = setTimeout(() => setJustUpdated(false), 2000);
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => setJustUpdated(false), 2000);
+
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => router.refresh(), REFRESH_QUIET_MS);
     };
 
     const channel = supabase
@@ -113,7 +137,8 @@ export function TeamBoard({
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(flashTimer);
+      clearTimeout(refreshTimer);
       void supabase.removeChannel(channel);
     };
   }, [router]);

@@ -20,10 +20,29 @@ export function Skeleton({
   );
 }
 
-/** A card-shaped placeholder, matching the spacing of a real Card. */
-export function SkeletonCard({ lines = 3 }: { lines?: number }) {
+/**
+ * A card-shaped placeholder, matching the spacing of a real Card.
+ *
+ * rounded-2xl, not rounded-xl: it has to match what Card actually renders, or
+ * the corners visibly tighten the moment real content replaces it. Takes a
+ * className so a skeleton can carry the same grid spans as the tile it stands
+ * in for - a placeholder in the wrong column is worse than none, because the
+ * page then jumps as it settles.
+ */
+export function SkeletonCard({
+  lines = 3,
+  className,
+}: {
+  lines?: number;
+  className?: string;
+}) {
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-card p-5">
+    <div
+      className={cn(
+        "min-w-0 space-y-3 rounded-2xl border border-border bg-card p-5",
+        className,
+      )}
+    >
       <Skeleton className="h-4 w-32" />
       {Array.from({ length: lines }, (_, i) => (
         <Skeleton

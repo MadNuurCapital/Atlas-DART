@@ -62,14 +62,13 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  const [todayRes, monthRes, targetRes, pendingRes, mixRes, coaching] =
+  // Today's row is NOT fetched separately. The range below runs to `today`
+  // inclusive, so it already contains it - asking for it again was a whole
+  // extra round trip to a database on the other side of the world, for a row
+  // that was about to arrive anyway. On this deployment that is roughly 300ms
+  // off the most-visited page in the app, for nothing.
+  const [monthRes, targetRes, pendingRes, mixRes, coaching] =
     await Promise.all([
-      supabase
-        .from("v_daily_consultant_summary")
-        .select("*")
-        .eq("user_id", profile.id)
-        .eq("business_date", today)
-        .maybeSingle(),
       supabase
         .from("v_daily_consultant_summary")
         .select("*")
@@ -100,14 +99,17 @@ export default async function DashboardPage() {
   // A failed read must not render as a zero. Showing S$0 to someone who has
   // written business this month is worse than an error screen, because they
   // have no way to tell it apart from the truth.
-  const todayRow = unwrap(todayRes, "today's submission");
   const monthRows = unwrap(monthRes, "this month's submissions");
   const targetRow = unwrap(targetRes, "your target");
   const pendingRow = unwrap(pendingRes, "pending inceptions");
   const mixRows = unwrap(mixRes, "the category mix");
 
-  const summary = (todayRow as DailyConsultantSummary | null) ?? null;
   const fetched = (monthRows as DailyConsultantSummary[]) ?? [];
+
+  // Today, picked out of the range rather than fetched again. Undefined here
+  // means the row genuinely does not exist yet - nothing has been recorded
+  // today - which is exactly what the separate query returned as null.
+  const summary = fetched.find((r) => r.business_date === today) ?? null;
 
   // The compliance figures are about THIS month, so they are counted over the
   // month window only - never over the extra day fetched above for the nudge.

@@ -1,8 +1,74 @@
+// This route reads VAPID_PRIVATE_KEY to check the key pair matches. A route
+// handler never ships to the browser anyway, but the declaration is what turns
+// a careless client import into a build error rather than a published secret -
+// and it is what the leak test looks for, which is how this line came to exist.
+import "server-only";
+
 import { NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/**
+ * Are the two VAPID keys actually a pair?
+ *
+ * This is the question nobody can answer by looking. The private key is a
+ * P-256 scalar and the public key is the point it generates, so the public one
+ * can be derived from the private one and compared. If they disagree, every
+ * notification fails at the moment of sending - the browser subscribed with
+ * one key and the server signs with another.
+ *
+ * Reports booleans and, at most, the first characters of the PUBLIC key. The
+ * private key is never returned, logged, or included in any error.
+ */
+function vapidStatus() {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
+  const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
+
+  if (!publicKey || !privateKey) {
+    return {
+      publicKeySet: Boolean(publicKey),
+      privateKeySet: Boolean(privateKey),
+      verdict:
+        "STOP - a VAPID key is missing, so the sender throws before it can send or log anything. Set both in Netlify, then redeploy.",
+    };
+  }
+
+  const publicBytes = Buffer.from(publicKey, "base64url").length;
+  const privateBytes = Buffer.from(privateKey, "base64url").length;
+
+  let derived: string | null = null;
+  let deriveError: string | null = null;
+  try {
+    const ecdh = crypto.createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(privateKey, "base64url"));
+    derived = ecdh.getPublicKey().toString("base64url");
+  } catch (error) {
+    deriveError = error instanceof Error ? error.message : String(error);
+  }
+
+  const matches = derived !== null && derived === publicKey;
+
+  return {
+    publicKeySet: true,
+    privateKeySet: true,
+    // 65 and 32 are the only correct answers for P-256. Anything else means a
+    // truncated or mangled paste, which throws on the sender's first line.
+    publicKeyBytes: publicBytes,
+    privateKeyBytes: privateBytes,
+    publicKeyStartsWith: publicKey.slice(0, 12),
+    pairMatches: matches,
+    verdict: deriveError
+      ? `STOP - the private key is not a valid P-256 key (${deriveError}). Regenerate BOTH keys as a pair.`
+      : matches
+        ? publicBytes === 65 && privateBytes === 32
+          ? "OK - the two keys are a genuine pair and correctly shaped."
+          : "OK as a pair, but one is the wrong length. Regenerate both."
+        : "STOP - the keys are NOT a pair. The browser subscribes with the public one and the server signs with the private one; every send will fail. Regenerate BOTH together and redeploy.",
+  };
+}
 
 /**
  * Where is the time actually going?
@@ -84,6 +150,15 @@ export async function GET() {
   return NextResponse.json(
     {
       verdict,
+      // Why notifications are or are not going out. Needs no token: an admin
+      // session is enough, which matters because the token-guarded manual
+      // trigger is unusable if REMINDER_TEST_TOKEN is itself unset.
+      push: {
+        ...vapidStatus(),
+        reminderTestTokenSet: Boolean(process.env.REMINDER_TEST_TOKEN),
+        appUrlSet: Boolean(process.env.APP_URL),
+        appUrl: process.env.APP_URL ?? "(not set)",
+      },
       auth: {
         // "ES256"/"RS256" means signatures are checked locally - fast.
         // "HS256" means the project is still on the legacy shared secret and

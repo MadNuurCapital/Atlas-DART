@@ -8,7 +8,9 @@ import {
   updateCase,
   createInsurer,
   type CaseActionResult,
+  type CaseCelebration,
 } from "@/app/(app)/cases/actions";
+import { CaseCelebrationDialog } from "@/components/cases/case-celebration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,6 +85,11 @@ export function CaseForm({
   const [addingInsurer, setAddingInsurer] = useState(false);
 
   const [errors, setErrors] = useState<Errors>({});
+
+  // Lives here rather than inside the form dialog: the form closes on success,
+  // and a celebration rendered inside a closed dialog is a celebration nobody
+  // sees.
+  const [celebration, setCelebration] = useState<CaseCelebration | null>(null);
   const [pending, startTransition] = useTransition();
 
   function submit() {
@@ -106,7 +113,13 @@ export function CaseForm({
       setErrors(result.fieldErrors ?? {});
       if (result.ok) {
         onOpenChange(false);
-        if (result.message) toast.success(result.message);
+        // A new case gets the congratulations panel instead of the toast; an
+        // edit gets the toast, because the two are not the same event.
+        if (result.celebrate) {
+          setCelebration(result.celebrate);
+        } else if (result.message) {
+          toast.success(result.message);
+        }
       } else if (result.message) {
         toast.error(result.message);
       } else {
@@ -137,6 +150,7 @@ export function CaseForm({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
@@ -341,5 +355,11 @@ export function CaseForm({
         </div>
       </DialogContent>
     </Dialog>
+
+      <CaseCelebrationDialog
+        celebration={celebration}
+        onClose={() => setCelebration(null)}
+      />
+    </>
   );
 }

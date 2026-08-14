@@ -14,12 +14,29 @@ import {
 } from "@/lib/validation";
 import type { Case } from "@/types/database";
 
+/**
+ * What was just written, for the congratulations panel to name.
+ *
+ * Returned only by createCase. An edit is bookkeeping; a new case is the thing
+ * the job is actually for, and it is worth marking.
+ */
+export type CaseCelebration = {
+  clientName: string;
+  policyType: string;
+  grAmount: number;
+  /** Their active GR for the month this case counts in, including this one. */
+  monthToDateGr: number;
+  monthLabel: string;
+};
+
 export type CaseActionResult = {
   ok: boolean;
   message?: string;
   fieldErrors?: Record<string, string | undefined>;
   /** Set when a new insurer was created inline, so the form can select it. */
   insurerId?: string;
+  /** Set only on a successful create. */
+  celebrate?: CaseCelebration;
 };
 
 const AUDITED_FIELDS = [
@@ -91,7 +108,69 @@ export async function createCase(
   });
 
   revalidateCasePaths();
-  return { ok: true, message: "Case added." };
+
+  // Their month-to-date total, read AFTER the insert so the new case is in it.
+  // Deliberately not computed by adding the new GR to a previously-read total:
+  // that would drift the moment a case was cancelled or edited in another tab,
+  // and a congratulations screen showing the wrong figure is worse than one
+  // showing none. A failure here costs the total, not the case - the case is
+  // already saved, so this must never turn a success into an error.
+  const created = data as Case;
+  const monthStart = created.date_submitted.slice(0, 8) + "01";
+  const monthEnd = lastDayOfMonth(created.date_submitted);
+
+  let monthToDateGr = 0;
+  const { data: monthCases, error: totalError } = await supabase
+    .from("cases")
+    .select("gr_amount")
+    .eq("consultant_id", profile.id)
+    .eq("status", "active")
+    .gte("date_submitted", monthStart)
+    .lte("date_submitted", monthEnd);
+
+  if (totalError) {
+    console.error(
+      "[cases] case saved but the month total could not be read: %s",
+      totalError.message,
+    );
+  } else {
+    monthToDateGr = (monthCases ?? []).reduce(
+      (sum, row) => sum + Number(row.gr_amount ?? 0),
+      0,
+    );
+  }
+
+  return {
+    ok: true,
+    message: "Case added.",
+    celebrate: {
+      clientName: created.client_name,
+      policyType: created.policy_type,
+      grAmount: Number(created.gr_amount ?? 0),
+      monthToDateGr,
+      monthLabel: monthNameOf(created.date_submitted),
+    },
+  };
+}
+
+/** Last calendar day of the month a business date falls in, as YYYY-MM-DD. */
+function lastDayOfMonth(businessDate: string): string {
+  const [y, m] = businessDate.split("-").map(Number) as [number, number];
+  // Day 0 of the next month is the last day of this one.
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+}
+
+/** "August" from a business date, for the congratulations line. */
+function monthNameOf(businessDate: string): string {
+  const [y, m, d] = businessDate.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  return new Intl.DateTimeFormat("en-SG", { month: "long" }).format(
+    new Date(Date.UTC(y, m - 1, d)),
+  );
 }
 
 export async function updateCase(

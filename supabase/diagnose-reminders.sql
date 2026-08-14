@@ -53,6 +53,17 @@ attempts as (
   where business_date >= public.sg_today() - 2
 ),
 
+-- The same, over all time. Three days cannot tell "never worked" apart from
+-- "worked once and stopped", and those need completely different fixes.
+ever as (
+  select
+    count(*)                                            as total,
+    count(*) filter (where reminder_type like 'push\_%') as push,
+    coalesce(min(business_date)::text, '-')             as first_day,
+    coalesce(max(business_date)::text, '-')             as last_day
+  from public.reminder_logs
+),
+
 report as (
 
   -- 0. Where and when we are, so the rest has context.
@@ -112,6 +123,20 @@ report as (
               then 'Never sent anything. See the STOP above.'
               else 'Compare this against the 7 PM - 6 AM schedule.' end
   from attempts a
+
+  union all
+  select 5, '3. SENDER', 'all time',
+         e.total || ' attempts ever (' || e.push || ' push), ' ||
+           case when e.total = 0 then 'none'
+                else e.first_day || ' to ' || e.last_day end,
+         case
+           when e.total = 0
+             then 'STOP - the sender has NEVER run, not once since the app went live. Enabling notifications does not start it: this is Netlify, not the database.'
+           when e.push = 0
+             then 'STOP - it has run, but never sent a push. A VAPID key is the usual cause.'
+           else 'It has worked before. Compare the last day above against when things changed.'
+         end
+  from ever e
 
   -- 4. The individual failures, with the error the push service returned.
   union all

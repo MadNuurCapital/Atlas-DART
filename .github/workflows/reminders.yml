@@ -1,0 +1,147 @@
+# =============================================================================
+# Drive the reminders from GitHub Actions.
+#
+# WHY THIS EXISTS
+# Every reminder function declares its own cron via `export const config` and
+# Netlify is supposed to invoke them. On this site it never has - reminder_logs
+# is empty since the app went live, not one attempt. The functions themselves
+# are fine: calling one over HTTP returns a proper response, and a test push
+# from inside the app arrives on the phone. Only the scheduling is missing.
+#
+# So the schedule comes from here instead. The `export const config` blocks are
+# deliberately LEFT IN PLACE - if Netlify's scheduler starts working, the
+# functions are idempotent and a duplicate run sends nothing twice: every send
+# is written to reminder_logs under a unique key and an already-sent reminder
+# is skipped.
+#
+# SETUP (both are required, once)
+#   Settings > Secrets and variables > Actions > New repository secret
+#     REMINDER_TEST_TOKEN   the same value as in Netlify's env vars
+#     APP_URL               https://atlasdartibw.netlify.app
+#
+# TWO THINGS TO KNOW ABOUT GITHUB'S SCHEDULER
+#   1. It is best-effort. A run can start several minutes after its slot when
+#      GitHub is busy. For a nag that closes at 11:59 PM this is fine; it is
+#      not fine for anything that has to land on the minute.
+#   2. GitHub disables scheduled workflows in a repository that has had no
+#      commits for 60 days, and emails the owner when it does. If reminders go
+#      quiet after a long stretch of nobody touching the repo, look here first:
+#      Actions > Reminders > "Enable workflow".
+#
+# All crons are UTC. Singapore is UTC+8.
+# =============================================================================
+
+name: Reminders
+
+on:
+  schedule:
+    # Hourly 11:00-22:00 UTC = 19:00-06:00 Singapore. The DART chase.
+    - cron: "0 11-22 * * *"
+    # 00:00 and 11:00 UTC = 08:00 and 19:00 Singapore. Coaching.
+    - cron: "0 0,11 * * *"
+    # 13:00 UTC = 21:00 Singapore. The email nudge.
+    - cron: "0 13 * * *"
+    # 22:00 UTC = 06:00 Singapore. The admin digest.
+    - cron: "0 22 * * *"
+
+  # So it can be fired by hand from the Actions tab, without a URL or a token.
+  workflow_dispatch:
+    inputs:
+      which:
+        description: "Which reminder to send"
+        required: true
+        default: push-reminders
+        type: choice
+        options:
+          - push-reminders
+          - coaching-reminders
+          - reminder-consultants
+          - reminder-admin-digest
+      dryRun:
+        description: "Report what would be sent, without sending it"
+        required: false
+        default: true
+        type: boolean
+
+# One at a time. Two overlapping runs would each read "not yet sent" before
+# either had written its log row, which is the one way to buzz a phone twice.
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Work out what this run should call
+        id: plan
+        env:
+          FIRED: ${{ github.event.schedule }}
+          MANUAL: ${{ inputs.which }}
+          DRY: ${{ inputs.dryRun }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MANUAL:-}" ]; then
+            echo "targets=${MANUAL}"            >> "$GITHUB_OUTPUT"
+            echo "dry=${DRY:-false}"            >> "$GITHUB_OUTPUT"
+          else
+            # Several crons can share a firing minute, so this maps the exact
+            # cron string GitHub reports back to the function(s) it belongs to.
+            case "${FIRED}" in
+              "0 11-22 * * *") targets="push-reminders" ;;
+              "0 0,11 * * *")  targets="coaching-reminders" ;;
+              "0 13 * * *")    targets="reminder-consultants" ;;
+              "0 22 * * *")    targets="reminder-admin-digest" ;;
+              *)               targets="" ;;
+            esac
+            echo "targets=${targets}" >> "$GITHUB_OUTPUT"
+            echo "dry=false"          >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Call the reminder function
+        if: steps.plan.outputs.targets != ''
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          TOKEN: ${{ secrets.REMINDER_TEST_TOKEN }}
+          TARGETS: ${{ steps.plan.outputs.targets }}
+          DRY: ${{ steps.plan.outputs.dry }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_URL:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "::error::APP_URL and REMINDER_TEST_TOKEN must both be set as repository secrets."
+            exit 1
+          fi
+
+          base="${APP_URL%/}"
+          failed=0
+
+          for fn in $TARGETS; do
+            url="${base}/.netlify/functions/${fn}"
+            [ "$DRY" = "true" ] && url="${url}?dryRun=true"
+
+            echo "::group::${fn}"
+            # The token goes in a header, never the URL - a query string ends up
+            # in logs and in Netlify's request records.
+            #
+            # `|| true` rather than `|| echo 000`: curl already prints 000 to
+            # stdout via -w when the request never completes, so an echo on top
+            # of it produced the memorable code "000000" and the run reported a
+            # transport failure as an HTTP status.
+            code=$(curl -sS -o response.json -w '%{http_code}' \
+                     --max-time 120 \
+                     -H "Authorization: Bearer ${TOKEN}" \
+                     "$url" || true)
+
+            echo "HTTP ${code}"
+            cat response.json 2>/dev/null || true
+            echo
+            echo "::endgroup::"
+
+            if [ "$code" != "200" ]; then
+              echo "::error::${fn} returned HTTP ${code}"
+              failed=1
+            fi
+          done
+
+          exit $failed

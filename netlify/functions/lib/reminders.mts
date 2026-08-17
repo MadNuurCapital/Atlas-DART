@@ -207,11 +207,15 @@ export async function sendEmail(opts: {
 }
 
 /**
- * Guard the manual HTTP trigger.
+ * Guard the HTTP trigger.
  *
  * Netlify Dev does not fire crons, so these functions need to be invokable by
- * hand - but an unguarded endpoint that emails the whole team is not something
- * to leave open.
+ * hand - but an unguarded endpoint that pushes to the whole team is not
+ * something to leave open.
+ *
+ * The token may arrive as `Authorization: Bearer <token>` or as `?token=`.
+ * Prefer the header: a query string is written to Netlify's request logs, so
+ * the query form is for a quick curl by hand and nothing that runs repeatedly.
  */
 export function authoriseManualRun(request: Request): boolean {
   const expected = process.env.REMINDER_TEST_TOKEN;
@@ -222,6 +226,29 @@ export function authoriseManualRun(request: Request): boolean {
   const fromQuery = new URL(request.url).searchParams.get("token") ?? "";
 
   return token === expected || fromQuery === expected;
+}
+
+/**
+ * The single gate every reminder function goes through.
+ *
+ * It used to be `if (!scheduled && !authoriseManualRun(request))`, where
+ * `scheduled` meant nothing more than "the URL has a ?scheduled parameter on
+ * it". That is not a fact about who is calling - it is a fact about the string
+ * the caller typed, and the caller can type anything. Any stranger who
+ * appended `?scheduled` got an unauthenticated run of the sender against the
+ * whole live team.
+ *
+ * The intent had been to let Netlify's own cron through without a token.
+ * Netlify's scheduled invocation does not carry that parameter, so the branch
+ * never once did the job it was written for; it only held the door open.
+ *
+ * So: the token is required, from everyone, always. The schedule now comes
+ * from GitHub Actions, which sends it. If Netlify's scheduler ever does start
+ * firing, its unauthenticated invocations will 401 and appear in the function
+ * log - visible, harmless, and not a second notification on anybody's phone.
+ */
+export function authoriseRun(request: Request): boolean {
+  return authoriseManualRun(request);
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   escapeHtml,
   summarise,
   authoriseManualRun,
+  authoriseRun,
   type MissingPerson,
 } from "../../netlify/functions/lib/reminders.mts";
 
@@ -139,6 +140,52 @@ describe("manual run authorisation", () => {
     // Fail closed. An unguarded endpoint that emails the whole team is not
     // something to leave open because an env var was forgotten.
     expect(withToken(undefined, "https://x.test/f?token=anything")).toBe(false);
+  });
+});
+
+describe("the gate every reminder function goes through", () => {
+  const guard = (url: string, header?: string) => {
+    const previous = process.env.REMINDER_TEST_TOKEN;
+    process.env.REMINDER_TEST_TOKEN = "s3cret";
+
+    const request = new Request(url, {
+      headers: header ? { authorization: header } : {},
+    });
+    const result = authoriseRun(request);
+
+    if (previous === undefined) delete process.env.REMINDER_TEST_TOKEN;
+    else process.env.REMINDER_TEST_TOKEN = previous;
+    return result;
+  };
+
+  it("lets a correct bearer token through", () => {
+    expect(guard("https://x.test/f", "Bearer s3cret")).toBe(true);
+  });
+
+  /**
+   * The regression this file exists for.
+   *
+   * The guard used to read `if (!scheduled && !authoriseManualRun(request))`,
+   * where `scheduled` was true whenever the URL carried a `?scheduled`
+   * parameter. That is not a fact about the caller, it is a fact about the
+   * string the caller typed - so anyone at all could type it and get an
+   * unauthenticated run of the sender against the live team.
+   */
+  it("is not opened by ?scheduled, which anyone can type", () => {
+    expect(guard("https://x.test/f?scheduled")).toBe(false);
+    expect(guard("https://x.test/f?scheduled=true")).toBe(false);
+    expect(guard("https://x.test/f?scheduled&dryRun=false")).toBe(false);
+  });
+
+  it("is not opened by ?scheduled alongside a wrong token", () => {
+    expect(guard("https://x.test/f?scheduled&token=nope")).toBe(false);
+    expect(guard("https://x.test/f?scheduled", "Bearer nope")).toBe(false);
+  });
+
+  it("turns nobody away who presents the token, parameters or not", () => {
+    expect(guard("https://x.test/f?scheduled&dryRun=true", "Bearer s3cret")).toBe(
+      true,
+    );
   });
 });
 

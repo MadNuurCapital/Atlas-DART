@@ -14,10 +14,14 @@
 # is written to reminder_logs under a unique key and an already-sent reminder
 # is skipped.
 #
-# SETUP (both are required, once)
+# SETUP (one secret, once)
 #   Settings > Secrets and variables > Actions > New repository secret
 #     REMINDER_TEST_TOKEN   the same value as in Netlify's env vars
-#     APP_URL               https://atlasdartibw.netlify.app
+#
+#   APP_URL is optional. It falls back to the production site below, because a
+#   site address is not a secret and making someone paste two things to fix one
+#   problem is how a fix goes unapplied. Set the secret only to point the
+#   workflow somewhere else - a custom domain, or a staging site.
 #
 # TWO THINGS TO KNOW ABOUT GITHUB'S SCHEDULER
 #   1. It is best-effort. A run can start several minutes after its slot when
@@ -101,15 +105,17 @@ jobs:
       - name: Call the reminder function
         if: steps.plan.outputs.targets != ''
         env:
-          APP_URL: ${{ secrets.APP_URL }}
+          # The site address is public, so it is a default rather than a
+          # required secret; the secret only overrides it.
+          APP_URL: ${{ secrets.APP_URL || 'https://atlasdartibw.netlify.app' }}
           TOKEN: ${{ secrets.REMINDER_TEST_TOKEN }}
           TARGETS: ${{ steps.plan.outputs.targets }}
           DRY: ${{ steps.plan.outputs.dry }}
         run: |
           set -euo pipefail
 
-          if [ -z "${APP_URL:-}" ] || [ -z "${TOKEN:-}" ]; then
-            echo "::error::APP_URL and REMINDER_TEST_TOKEN must both be set as repository secrets."
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::REMINDER_TEST_TOKEN is not set. Add it under Settings > Secrets and variables > Actions, using the same value as the REMINDER_TEST_TOKEN env var in Netlify. Until then every run fails here and no reminder is sent."
             exit 1
           fi
 

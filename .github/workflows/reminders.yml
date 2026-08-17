@@ -144,10 +144,28 @@ jobs:
             echo
             echo "::endgroup::"
 
-            if [ "$code" != "200" ]; then
-              echo "::error::${fn} returned HTTP ${code}"
-              failed=1
-            fi
+            case "$code" in
+              200) ;;
+              3*)
+                # curl deliberately does not follow redirects here. A 3xx means
+                # something sits in front of the function and answered instead
+                # of it - which is exactly what happened once: the Next.js
+                # middleware matched /.netlify/* , found no session cookie on a
+                # scheduler's request, and bounced it to /login with a 307.
+                # Following the redirect would have returned 200 for the login
+                # page and reported a healthy run that sent nothing at all.
+                echo "::error::${fn} returned HTTP ${code} - a redirect. Something is answering in front of the function; check the middleware matcher in middleware.ts excludes .netlify"
+                failed=1
+                ;;
+              401)
+                echo "::error::${fn} returned HTTP 401. The REMINDER_TEST_TOKEN secret here does not match the REMINDER_TEST_TOKEN env var in Netlify, or Netlify has not redeployed since it changed."
+                failed=1
+                ;;
+              *)
+                echo "::error::${fn} returned HTTP ${code}"
+                failed=1
+                ;;
+            esac
           done
 
           exit $failed

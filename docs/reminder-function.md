@@ -17,6 +17,34 @@ optional extra on top.
 fail. Otherwise it would write one fabricated `failed` row per person per day,
 which buries real failures and marks the day as already attempted.
 
+## Who actually fires these
+
+Each function declares its own cron in `export const config`, and Netlify is
+meant to invoke it. On the live site it never did — `reminder_logs` was empty
+from launch until the problem was found, not one attempt, while the functions
+themselves answered correctly over HTTP and a test push reached a phone. The
+declaration was right; the scheduler never ran it.
+
+So `.github/workflows/reminders.yml` calls the same four functions on the same
+crons from GitHub Actions. **The `export const config` blocks stay** — they
+cost nothing, they document the intended schedule next to the code it belongs
+to, and if Netlify's scheduler ever starts working the duplicate run sends
+nothing twice: every send is written to `reminder_logs` under a unique
+`(user_id, business_date, reminder_type)` key and an already-sent reminder is
+skipped.
+
+The workflow needs two repository secrets, `REMINDER_TEST_TOKEN` (matching
+Netlify's env var) and `APP_URL`. It authenticates with an `Authorization:
+Bearer` header rather than a `?token=` query string, because query strings are
+written to logs. It can also be fired by hand from the Actions tab, with a
+dry-run option.
+
+Two properties of GitHub's scheduler are worth knowing: a run can start several
+minutes late when GitHub is busy, and scheduled workflows are disabled
+automatically in a repository with no commits for 60 days. If reminders go
+quiet after a long stretch of nobody touching the repo, check
+**Actions → Reminders** for a disabled workflow before looking anywhere else.
+
 ## The hourly chase
 
 `push-reminders` runs every hour from 11:00 to 22:00 UTC — 19:00 through 06:00

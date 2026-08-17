@@ -1,10 +1,13 @@
 # Reminder functions
 
-Three Netlify Scheduled Functions.
+Four ordinary HTTP functions, driven on a schedule by GitHub Actions.
+Deliberately **not** Netlify Scheduled Functions - see "Who actually fires
+these" below for why that distinction is the whole ballgame.
 
 | Function | Cron (UTC) | Singapore | What it does |
 |---|---|---|---|
 | `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | Chases anyone still missing |
+| `coaching-reminders` | `0 0,11 * * *` | 08:00 and 19:00 | Reminds both sides of a booked coaching session |
 | `reminder-consultants` | `0 13 * * *` | 21:00 | One email — **skips itself entirely** until a Resend sender exists |
 | `reminder-admin-digest` | `0 22 * * *` | 06:00 | Notifies admins of yesterday's missing list, and emails it too if Resend is set up |
 
@@ -19,19 +22,30 @@ which buries real failures and marks the day as already attempted.
 
 ## Who actually fires these
 
-Each function declares its own cron in `export const config`, and Netlify is
-meant to invoke it. On the live site it never did — `reminder_logs` was empty
-from launch until the problem was found, not one attempt, while the functions
-themselves answered correctly over HTTP and a test push reached a phone. The
-declaration was right; the scheduler never ran it.
+`.github/workflows/reminders.yml`, on GitHub Actions. Not Netlify.
 
-So `.github/workflows/reminders.yml` calls the same four functions on the same
-crons from GitHub Actions. **The `export const config` blocks stay** — they
-cost nothing, they document the intended schedule next to the code it belongs
-to, and if Netlify's scheduler ever starts working the duplicate run sends
-nothing twice: every send is written to `reminder_logs` under a unique
-`(user_id, business_date, reminder_type)` key and an already-sent reminder is
-skipped.
+These are **ordinary HTTP functions**. None of them declares
+`export const config = { schedule }`, and that omission is load-bearing:
+
+> A Netlify Scheduled Function has **no public HTTP endpoint in production**.
+> Declaring a schedule removes the endpoint. Requests to
+> `/.netlify/functions/<name>` are answered with an empty `403` at the edge,
+> before the function is reached.
+
+All four used to declare one, and the effect was that nothing could ever call
+them. `reminder_logs` was empty from launch — not one attempt — and that reads
+identically to a schedule that never fires, which is why it took three passes
+to corner. Netlify's own scheduler never invoked them either, so the two
+failures hid behind each other.
+
+Reverting to `export const config` would silently break every reminder again.
+If a schedule is ever wanted on Netlify's side, it has to be a *separate*
+scheduled function that shares this implementation, leaving these endpoints
+reachable.
+
+Duplicate runs are harmless in any case: every send is written to
+`reminder_logs` under a unique `(user_id, business_date, reminder_type)` key,
+and an already-sent reminder is skipped.
 
 The workflow needs **one** repository secret: `REMINDER_TEST_TOKEN`, matching
 the env var of the same name in Netlify. `APP_URL` is an optional second one
@@ -78,7 +92,7 @@ Notifications share a tag, so a later one replaces the earlier rather than
 stacking twelve by morning.
 
 Each hour writes its own `reminder_logs` row (`push_19`, `push_20`, …) so a
-Netlify retry is idempotent within the hour without one hour blocking the next.
+re-run is idempotent within the hour without one hour blocking the next.
 
 A subscription that returns 404 or 410 is deleted rather than retried hourly
 forever — that status means the browser has thrown it away for good.
@@ -107,7 +121,7 @@ work the digest exists to save. It opens `/admin/daily` for that date.
 When nobody is missing the notification is silent: "everyone submitted" is
 worth knowing, but not worth a sound at 6am.
 
-Cron expressions in `netlify.toml` and in `export const config` are always UTC. Singapore is UTC+8 year-round with no daylight saving, so the conversion is fixed.
+Cron expressions in the workflow are always UTC. Singapore is UTC+8 year-round with no daylight saving, so the conversion is fixed.
 
 ## What each run does
 
@@ -117,7 +131,7 @@ Cron expressions in `netlify.toml` and in `export const config` are always UTC. 
 4. Send through Resend.
 5. Upsert the outcome into `reminder_logs` on `(user_id, business_date, reminder_type)`.
 
-The unique key is the real guarantee. Netlify may retry a scheduled function, and a retry lands on the same row rather than sending a second email.
+The unique key is the real guarantee. A retry - GitHub re-running a job, or someone firing the workflow by hand - lands on the same row rather than sending a second email.
 
 A failed row must carry an error message — `reminder_logs_failure_has_reason` is a CHECK constraint, so a silent failure cannot be recorded. Silent failure is how a reminder system rots without anyone noticing.
 
@@ -159,7 +173,7 @@ unauthenticated run of the sender against the live team. It was written to let
 Netlify's own cron through — which does not send that parameter, so the branch
 never once did its job and only held the door open.
 
-Against a deployed site, swap the host for your Netlify URL. You can also invoke a deployed scheduled function from the Netlify UI under **Functions → the function → Trigger**.
+Against a deployed site, swap the host for your Netlify URL. These are ordinary HTTP functions, so that works from anywhere - which is the point, and was not true while they declared a schedule.
 
 Start with `dryRun=true`. Confirm the list of names is who you expect **before** sending anything to real people.
 

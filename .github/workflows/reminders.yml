@@ -161,6 +161,15 @@ jobs:
                 echo "::error::${fn} returned HTTP 401. The REMINDER_TEST_TOKEN secret here does not match the REMINDER_TEST_TOKEN env var in Netlify, or Netlify has not redeployed since it changed."
                 failed=1
                 ;;
+              403)
+                # An empty 403 answered in milliseconds is Netlify's edge, not
+                # the function - the function's own refusal is a 401 with a
+                # body. This is what a Netlify Scheduled Function looks like
+                # from outside: declaring `export const config = { schedule }`
+                # removes the public HTTP endpoint entirely.
+                echo "::error::${fn} returned HTTP 403 from Netlify's edge, so the function was never reached. Check that netlify/functions/${fn}.mts does NOT declare 'export const config = { schedule }' - a scheduled function has no public HTTP endpoint in production."
+                failed=1
+                ;;
               *)
                 echo "::error::${fn} returned HTTP ${code}"
                 failed=1

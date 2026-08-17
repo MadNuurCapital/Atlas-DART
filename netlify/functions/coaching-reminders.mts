@@ -1,4 +1,3 @@
-import type { Config } from "@netlify/functions";
 import { adminClient, appUrl, authoriseRun } from "./lib/reminders.mts";
 import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
@@ -202,8 +201,18 @@ export default async function handler(request: Request) {
   }
 }
 
-export const config: Config = {
-  // 00:00 UTC = 08:00 Singapore (morning of)
-  // 11:00 UTC = 19:00 Singapore (evening before)
-  schedule: "0 0,11 * * *",
-};
+/*
+ * There is deliberately no `export const config = { schedule }` here.
+ *
+ * Declaring a schedule turns this into a Netlify Scheduled Function, and a
+ * scheduled function has NO PUBLIC HTTP ENDPOINT in production - Netlify
+ * answers /.netlify/functions/coaching-reminders with an empty 403 at the edge, before
+ * the function is reached. That block was therefore not the harmless
+ * documentation it looked like: it was the thing preventing any caller from
+ * ever running this.
+ *
+ * The schedule lives in .github/workflows/reminders.yml, which calls this
+ * over HTTP with the shared token:
+ *
+ *   0 0,11 * * * UTC = 08:00 and 19:00 Asia/Singapore
+ */

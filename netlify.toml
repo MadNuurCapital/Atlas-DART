@@ -12,10 +12,19 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Scheduled functions declare their own cron via `export const config` in the
-# function file itself (netlify/functions/*.mts). Both crons are UTC.
-#   reminder-consultants   0 13 * * *   -> 21:00 Asia/Singapore
-#   reminder-admin-digest 59 15 * * *   -> 23:59 Asia/Singapore
+# The reminder functions are ORDINARY HTTP FUNCTIONS and must stay that way.
+#
+# They are called on a schedule by .github/workflows/reminders.yml. None of
+# them declares `export const config = { schedule }`, because a Netlify
+# Scheduled Function has no public HTTP endpoint in production - Netlify
+# answers /.netlify/functions/<name> with an empty 403 at the edge. Adding a
+# schedule back would make every reminder silently unreachable again.
+#
+# Crons (UTC; Singapore is UTC+8):
+#   push-reminders         0 11-22 * * *  -> hourly 19:00-06:00
+#   coaching-reminders     0 0,11 * * *   -> 08:00 and 19:00
+#   reminder-consultants   0 13 * * *     -> 21:00
+#   reminder-admin-digest  0 22 * * *     -> 06:00
 
 [dev]
   framework = "next"

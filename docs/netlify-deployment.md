@@ -54,9 +54,11 @@ The Next.js Runtime v5 is auto-detected. Do **not** install `@netlify/plugin-nex
 
 `src/lib/supabase/admin.ts` imports `server-only`, so importing the secret key into a client component is a build error rather than a runtime leak. A test additionally scans the built client bundle for it.
 
-## Scheduled functions
+## Reminder functions
 
-Declared in the function files themselves via `export const config = { schedule }`, not in `netlify.toml` and not as legacy scheduled API routes.
+Ordinary HTTP functions, called on a schedule by `.github/workflows/reminders.yml`.
+
+They must **not** declare `export const config = { schedule }`. Doing so makes them Netlify Scheduled Functions, and a scheduled function has no public HTTP endpoint in production - Netlify answers `/.netlify/functions/<name>` with an empty 403 at the edge. That is unreachable by the workflow, by curl, and by the Netlify UI's own trigger button.
 
 | Function | Cron (UTC) | Singapore | Needs |
 |---|---|---|---|

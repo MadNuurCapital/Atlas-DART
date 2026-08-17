@@ -4,7 +4,7 @@ import {
   adminDigestEmail,
   alreadySent,
   appUrl,
-  authoriseManualRun,
+  authoriseRun,
   emailConfigured,
   findAdmins,
   findMissing,
@@ -74,9 +74,7 @@ function previousDay(date: string): string {
  */
 export default async function handler(request: Request) {
   const url = new URL(request.url);
-  const scheduled = url.searchParams.get("scheduled") !== null;
-
-  if (!scheduled && !authoriseManualRun(request)) {
+  if (!authoriseRun(request)) {
     return new Response("Unauthorised", { status: 401 });
   }
 

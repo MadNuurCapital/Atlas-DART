@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { adminClient, appUrl, authoriseManualRun } from "./lib/reminders.mts";
+import { adminClient, appUrl, authoriseRun } from "./lib/reminders.mts";
 import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
 /**
@@ -59,9 +59,7 @@ type Kind = "day_before" | "morning_of";
 
 export default async function handler(request: Request) {
   const url = new URL(request.url);
-  const scheduled = url.searchParams.get("scheduled") !== null;
-
-  if (!scheduled && !authoriseManualRun(request)) {
+  if (!authoriseRun(request)) {
     return new Response("Unauthorised", { status: 401 });
   }
 

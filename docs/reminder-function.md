@@ -33,11 +33,15 @@ nothing twice: every send is written to `reminder_logs` under a unique
 `(user_id, business_date, reminder_type)` key and an already-sent reminder is
 skipped.
 
-The workflow needs two repository secrets, `REMINDER_TEST_TOKEN` (matching
-Netlify's env var) and `APP_URL`. It authenticates with an `Authorization:
-Bearer` header rather than a `?token=` query string, because query strings are
-written to logs. It can also be fired by hand from the Actions tab, with a
-dry-run option.
+The workflow needs **one** repository secret: `REMINDER_TEST_TOKEN`, matching
+the env var of the same name in Netlify. `APP_URL` is an optional second one
+that only overrides the production address baked into the workflow — a site
+address is not a secret, and making someone paste two things to fix one problem
+is how a fix goes unapplied.
+
+It authenticates with an `Authorization: Bearer` header rather than a `?token=`
+query string, because query strings are written to logs. It can also be fired
+by hand from the Actions tab, with a dry-run option.
 
 Two properties of GitHub's scheduler are worth knowing: a run can start several
 minutes late when GitHub is busy, and scheduled workflows are disabled
@@ -141,7 +145,19 @@ curl "http://localhost:8888/.netlify/functions/reminder-consultants?date=2026-03
 curl "http://localhost:8888/.netlify/functions/reminder-admin-digest?dryRun=true&token=$REMINDER_TEST_TOKEN"
 ```
 
-The token may also be sent as `Authorization: Bearer <token>`.
+Prefer `Authorization: Bearer <token>` over `?token=` for anything that runs
+more than once — a query string is written to Netlify's request logs, and the
+GitHub workflow uses the header for exactly that reason. The query form is kept
+for a quick curl by hand.
+
+**Every caller needs the token, including the schedule.** There is no
+unauthenticated path. There used to be: the guard read `if (!scheduled &&
+!authoriseManualRun(request))`, where `scheduled` meant only that the URL
+carried a `?scheduled` parameter. That is a fact about the string the caller
+typed, not about who the caller is, so anyone who appended `?scheduled` got an
+unauthenticated run of the sender against the live team. It was written to let
+Netlify's own cron through — which does not send that parameter, so the branch
+never once did its job and only held the door open.
 
 Against a deployed site, swap the host for your Netlify URL. You can also invoke a deployed scheduled function from the Netlify UI under **Functions → the function → Trigger**.
 

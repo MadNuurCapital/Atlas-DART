@@ -3,7 +3,7 @@ import {
   adminClient,
   alreadySent,
   appUrl,
-  authoriseManualRun,
+  authoriseRun,
   findMissing,
   sgToday,
 } from "./lib/reminders.mts";
@@ -88,9 +88,8 @@ function previousDay(date: string): string {
 
 export default async function handler(request: Request) {
   const url = new URL(request.url);
-  const scheduled = url.searchParams.get("scheduled") !== null;
 
-  if (!scheduled && !authoriseManualRun(request)) {
+  if (!authoriseRun(request)) {
     return new Response("Unauthorised", { status: 401 });
   }
 

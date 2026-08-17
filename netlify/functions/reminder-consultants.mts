@@ -2,7 +2,7 @@ import type { Config } from "@netlify/functions";
 import {
   adminClient,
   alreadySent,
-  authoriseManualRun,
+  authoriseRun,
   consultantEmail,
   emailConfigured,
   findMissing,
@@ -28,13 +28,12 @@ const REMINDER_TYPE = "consultant_missing";
  * second one.
  */
 export default async function handler(request: Request) {
-  const isManual = request.method === "POST" || request.method === "GET";
   const url = new URL(request.url);
-  const scheduled = url.searchParams.get("scheduled") !== null;
 
-  // A manual invocation must present the shared token. The scheduled run
-  // arrives from Netlify itself and carries no request to authorise.
-  if (isManual && !scheduled && !authoriseManualRun(request)) {
+  // Every caller presents the token. `isManual` used to sit in front of this
+  // and was `method === "POST" || method === "GET"` - true for every request
+  // that can reach a function, so it gated nothing.
+  if (!authoriseRun(request)) {
     return new Response("Unauthorised", { status: 401 });
   }
 

@@ -51,15 +51,31 @@ create extension if not exists pg_net;
 -- >>> REPLACE THE VALUE BELOW with the same string that is in Netlify's
 -- >>> environment variables and in the GitHub repository secret. All three
 -- >>> must match exactly.
+--
+-- This block REPLACES whatever is stored, rather than skipping when a secret
+-- already exists. An earlier version skipped, which meant that running the
+-- script once with the placeholder still in it left the placeholder in Vault
+-- permanently: every pg_cron call got a 401, and re-running the script
+-- silently changed nothing. Correcting a wrong token has to be the easy path.
 
-select vault.create_secret(
-  'PASTE_THE_REMINDER_TEST_TOKEN_HERE',
-  'atlas_dart_reminder_token',
-  'Shared token the reminder functions require from every caller'
-)
-where not exists (
-  select 1 from vault.secrets where name = 'atlas_dart_reminder_token'
-);
+do $$
+declare
+  wanted text := 'PASTE_THE_REMINDER_TEST_TOKEN_HERE';
+begin
+  if wanted like 'PASTE%' or length(wanted) < 20 then
+    raise exception
+      'Replace the placeholder in section 2 with the real REMINDER_TEST_TOKEN, the same one that is in Netlify. Nothing has been changed.';
+  end if;
+
+  delete from vault.secrets where name = 'atlas_dart_reminder_token';
+
+  perform vault.create_secret(
+    wanted,
+    'atlas_dart_reminder_token',
+    'Shared token the reminder functions require from every caller'
+  );
+end;
+$$;
 
 
 -- ---------------------------------------------------------------------------
@@ -141,14 +157,55 @@ select cron.schedule(
 
 
 -- ---------------------------------------------------------------------------
--- 5. What you should see
+-- 5. Prove the token actually works, before trusting it at 7 PM
 -- ---------------------------------------------------------------------------
--- Four rows, all active, with the crons above.
+-- Four active jobs is NOT proof the reminders will fire. The jobs can be
+-- perfectly scheduled and every call still rejected, which is exactly what
+-- happened the first time this script was run: the placeholder went into Vault
+-- and every call came back 401, with nothing to show for it until someone
+-- looked.
+--
+-- reminder-consultants is used for the test because it sends nothing at all
+-- while Resend has no verified sender - it returns early rather than
+-- attempting a send it knows will fail. So this is a safe call at any hour.
 
-select jobname, schedule, active
-  from cron.job
- where jobname like 'atlas-dart-%'
- order by jobname;
+-- The Supabase SQL editor shows only the LAST statement's result, so the
+-- verdict is deliberately last. The job list is folded into it rather than
+-- being its own SELECT, which would have hidden the answer.
+
+select public.call_reminder('reminder-consultants') as test_request_id;
+
+-- pg_net is asynchronous, so give it a moment before reading the reply.
+select pg_sleep(6);
+
+with jobs as (
+  select count(*) filter (where active) as active_jobs
+    from cron.job
+   where jobname like 'atlas-dart-%'
+),
+reply as (
+  select status_code, content
+    from net._http_response
+   order by id desc
+   limit 1
+)
+select
+  j.active_jobs,
+  r.status_code,
+  case
+    when j.active_jobs < 4
+      then 'STOP - expected 4 active jobs. Section 4 did not run.'
+    when r.status_code = 200
+      then 'OK - 4 jobs scheduled, token accepted. The reminders will fire.'
+    when r.status_code = 401
+      then 'STOP - the token in Vault does not match the one in Netlify. Re-run section 2 with the correct value.'
+    when r.status_code is null
+      then 'No reply yet - re-run this final query in a few seconds.'
+    else 'STOP - unexpected reply. Read the content column.'
+  end as verdict,
+  left(r.content, 200) as content
+from jobs j
+left join reply r on true;
 
 
 -- ===========================================================================

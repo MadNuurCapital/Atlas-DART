@@ -4,6 +4,8 @@ import {
   alreadySent,
   appUrl,
   authoriseRun,
+  sgHour,
+  withinHourWindow,
   emailConfigured,
   findAdmins,
   findMissing,
@@ -71,6 +73,14 @@ function previousDay(date: string): string {
  * A digest is sent even when nobody is missing, because "everyone submitted"
  * is itself information worth having with the morning coffee.
  */
+/**
+ * The hours the digest may be delivered in, as Singapore hours, inclusive.
+ * It aims at 06:00; anything up to early afternoon is still a useful morning
+ * briefing, and past that it is noise.
+ */
+const DIGEST_FROM = 5;
+const DIGEST_TO = 13;
+
 export default async function handler(request: Request) {
   const url = new URL(request.url);
   if (!authoriseRun(request)) {
@@ -80,6 +90,28 @@ export default async function handler(request: Request) {
   // At 6am the day being reported on is yesterday.
   const businessDate = url.searchParams.get("date") ?? previousDay(sgToday());
   const dryRun = url.searchParams.get("dryRun") === "true";
+  const hour = Number(url.searchParams.get("hour") ?? sgHour());
+
+  // The digest is a 6 AM briefing. Delivered at 8 PM it is not a briefing, it
+  // is a notification about a day that closed nearly two days ago. The window
+  // is generous - an ordinarily late run still arrives - but a badly late one
+  // is dropped rather than sent at a nonsensical hour. The same list is always
+  // on /admin/daily.
+  if (!withinHourWindow(hour, DIGEST_FROM, DIGEST_TO)) {
+    console.log(
+      "[reminder-admin-digest] hour=%d is outside the %d:00-%d:00 window - sending nothing",
+      hour,
+      DIGEST_FROM,
+      DIGEST_TO,
+    );
+    return Response.json({
+      businessDate,
+      hour,
+      skipped: "outside the digest window",
+      window: `0${DIGEST_FROM}:00-${DIGEST_TO}:59 Asia/Singapore`,
+      sent: 0,
+    });
+  }
 
   console.log(
     "[reminder-admin-digest] start date=%s dryRun=%s",

@@ -63,6 +63,45 @@ automatically in a repository with no commits for 60 days. If reminders go
 quiet after a long stretch of nobody touching the repo, check
 **Actions → Reminders** for a disabled workflow before looking anywhere else.
 
+### GitHub is not punctual, and that is designed around
+
+Measured over the fortnight to 1 September 2026: about **190 runs delivered of
+an expected 245**, typically 15–40 minutes late, occasionally hours late. On 25
+August the evening chase ran all twelve of its hours; on 29, 30 and 31 August
+it managed about five.
+
+Two things follow, and both are load-bearing:
+
+**Every function refuses to run outside its own window.** They decide what to
+send by reading the clock, which is right on time and wrong when late. Before
+this, `levelForHour` mapped every hour from 7am to 8pm to `firm`, so a chase
+that slipped to lunchtime told the whole team their DART was not updated — at
+lunchtime, with sound. Coaching was worse: the 08:00 run once arrived at 17:47
+and sent the *evening-before* reminder for the *next* day instead of the
+*morning-of* one, which went unnoticed only because no session was booked.
+
+| Function | Delivers only during (Singapore) |
+|---|---|
+| `push-reminders` | 19:00–06:00 |
+| `coaching-reminders` | 06:00–11:59 as `morning_of`, 17:00–22:59 as `day_before` |
+| `reminder-admin-digest` | 05:00–13:59 |
+
+Outside those hours the function returns a `skipped` summary and writes no log
+row, so the slot is still free to run properly if it arrives. Missing one
+hourly nag costs little — there is another next hour. Sending one at the wrong
+time costs trust in the whole system.
+
+`?hour=` overrides the clock for testing, and the window applies to whatever
+hour is passed, so a simulated `19` behaves exactly as 7 PM does.
+
+**A second scheduler covers the missed slots.** `supabase/enable-pg-cron-reminders.sql`
+adds pg_cron jobs inside Supabase on the same four crons. Both schedulers call
+the same functions; whichever arrives first does the work, and the other finds
+the `reminder_logs` row already written and sends nothing. Two schedulers
+against one idempotent target beats one unreliable scheduler. The token lives
+in Supabase Vault rather than in the job definition, where it would sit in
+plain text in `cron.job`.
+
 ## The hourly chase
 
 `push-reminders` runs every hour from 11:00 to 22:00 UTC — 19:00 through 06:00

@@ -56,6 +56,49 @@ export function formatSgDate(date: string): string {
   }).format(new Date(`${date}T04:00:00Z`));
 }
 
+/** The hour of the Singapore clock, 0-23, at an instant. */
+export function sgHour(now: Date = new Date()): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Singapore",
+      hour: "2-digit",
+      hour12: false,
+    }).format(now),
+  );
+}
+
+/**
+ * Is this hour inside a window, counting round midnight?
+ *
+ * Both ends are inclusive, and `from` may be greater than `to`: the DART chase
+ * is 19..6, which is a window that wraps.
+ *
+ * WHY THIS EXISTS
+ * Every reminder function decides what to send by reading the clock at the
+ * moment it runs. That is right when it runs on time and wrong when it does
+ * not, and GitHub's scheduler is only best-effort - runs arrive late, some by
+ * hours, and some never arrive at all.
+ *
+ * A late run used to send anyway. `levelForHour` mapped every hour from 7am to
+ * 8pm to "firm", so a chase that slipped to lunchtime told the whole team
+ * their DART was not updated, at lunchtime, with sound. That is the
+ * "notifications at different timings" the team reported.
+ *
+ * So each function now checks that the clock actually agrees it is time. A run
+ * that arrives outside its window sends nothing and says so. Missing one
+ * hourly nag costs little - there is another next hour, and the person is
+ * still chased. Sending one at the wrong time costs trust in the whole thing.
+ */
+export function withinHourWindow(
+  hour: number,
+  from: number,
+  to: number,
+): boolean {
+  return from <= to
+    ? hour >= from && hour <= to
+    : hour >= from || hour <= to;
+}
+
 /**
  * Everyone active with no SUBMITTED record for the date. A draft does not
  * count - a half-filled form is not a submission.

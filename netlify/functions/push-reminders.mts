@@ -4,7 +4,9 @@ import {
   appUrl,
   authoriseRun,
   findMissing,
+  sgHour,
   sgToday,
+  withinHourWindow,
 } from "./lib/reminders.mts";
 import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
@@ -25,6 +27,16 @@ import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
  */
 
 const NAG_END_HOUR = 7;
+
+/**
+ * The chase window, in Singapore hours, both ends inclusive: 7 PM to 6 AM.
+ *
+ * These are exactly the hours the schedule aims at (11:00-22:00 UTC). A run
+ * landing outside them is a late one, and a late chase is not a chase - it is
+ * a notification at a time nobody agreed to.
+ */
+const WINDOW_FROM = 19;
+const WINDOW_TO = 6;
 
 type Level = "firm" | "urgent" | "final" | "overdue";
 
@@ -68,16 +80,6 @@ function copyFor(level: Level, firstName: string) {
   }
 }
 
-function sgHourNow(now: Date = new Date()): number {
-  return Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Asia/Singapore",
-      hour: "2-digit",
-      hour12: false,
-    }).format(now),
-  );
-}
-
 /** Yesterday, in the Singapore calendar. */
 function previousDay(date: string): string {
   const [y, m, d] = date.split("-").map(Number) as [number, number, number];
@@ -92,7 +94,7 @@ export default async function handler(request: Request) {
     return new Response("Unauthorised", { status: 401 });
   }
 
-  const hour = Number(url.searchParams.get("hour") ?? sgHourNow());
+  const hour = Number(url.searchParams.get("hour") ?? sgHour());
   const level = levelForHour(hour);
 
   // Overnight the day being chased is yesterday. Today has barely started.
@@ -110,6 +112,32 @@ export default async function handler(request: Request) {
     level,
     dryRun,
   );
+
+  // Refuse to chase outside the hours the team agreed to.
+  //
+  // The schedule aims at 7 PM - 6 AM, but a run can arrive hours late, and
+  // this function reads the clock to decide what to send. Without this check a
+  // slipped run nagged everyone at lunchtime. Nothing is sent and nothing is
+  // logged, so the hour is still free to run properly if it ever arrives.
+  //
+  // Pass ?hour= to test a specific hour; the check applies to that hour, so a
+  // simulated 19 behaves exactly as 7 PM would.
+  if (!withinHourWindow(hour, WINDOW_FROM, WINDOW_TO)) {
+    console.log(
+      "[push-reminders] hour=%d is outside the %d:00-%d:00 window - sending nothing",
+      hour,
+      WINDOW_FROM,
+      WINDOW_TO,
+    );
+    return Response.json({
+      businessDate,
+      hour,
+      skipped: "outside the chase window",
+      window: `${WINDOW_FROM}:00-0${WINDOW_TO}:00 Asia/Singapore`,
+      missing: 0,
+      sent: 0,
+    });
+  }
 
   try {
     configureVapid();

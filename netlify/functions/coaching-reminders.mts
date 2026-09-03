@@ -1,4 +1,10 @@
-import { adminClient, appUrl, authoriseRun } from "./lib/reminders.mts";
+import {
+  adminClient,
+  appUrl,
+  authoriseRun,
+  sgHour,
+  withinHourWindow,
+} from "./lib/reminders.mts";
 import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
 /**
@@ -29,16 +35,6 @@ function sgDate(at: Date): string {
   }).format(at);
 }
 
-function sgHour(at: Date): number {
-  return Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: SG_TIME_ZONE,
-      hour: "2-digit",
-      hour12: false,
-    }).format(at),
-  );
-}
-
 function sgTimeLabel(at: Date): string {
   return new Intl.DateTimeFormat("en-SG", {
     timeZone: SG_TIME_ZONE,
@@ -56,6 +52,30 @@ function nextDay(date: string): string {
 
 type Kind = "day_before" | "morning_of";
 
+/**
+ * The two slots this runs in, as Singapore hours, both ends inclusive.
+ *
+ * The schedule aims at 08:00 and 19:00. The windows are wider than that so an
+ * ordinarily late run still lands, but narrow enough that a badly late one
+ * does not quietly turn into the other reminder.
+ *
+ * That is not hypothetical. The 08:00 run once arrived at 17:47 and, because
+ * the kind was chosen by asking whether the hour was before midday, sent the
+ * EVENING-BEFORE reminder for the NEXT day instead of the morning-of reminder
+ * for that day. Nobody noticed only because no session was booked.
+ */
+const MORNING_FROM = 6;
+const MORNING_TO = 11;
+const EVENING_FROM = 17;
+const EVENING_TO = 22;
+
+/** Which reminder this hour is for, or null if it is for neither. */
+function kindForHour(hour: number): Kind | null {
+  if (withinHourWindow(hour, MORNING_FROM, MORNING_TO)) return "morning_of";
+  if (withinHourWindow(hour, EVENING_FROM, EVENING_TO)) return "day_before";
+  return null;
+}
+
 export default async function handler(request: Request) {
   const url = new URL(request.url);
   if (!authoriseRun(request)) {
@@ -66,12 +86,27 @@ export default async function handler(request: Request) {
   const hour = Number(url.searchParams.get("hour") ?? sgHour(now));
   const dryRun = url.searchParams.get("dryRun") === "true";
 
-  // Before midday Singapore this run is about today's sessions; in the evening
-  // it is about tomorrow's. Anything else is a manual invocation, and the
-  // caller says which they meant.
-  const kind: Kind =
-    (url.searchParams.get("kind") as Kind | null) ??
-    (hour < 12 ? "morning_of" : "day_before");
+  // Which reminder is this? An explicit ?kind= wins, for a manual run. There
+  // is otherwise no way to tell the two apart from the outside: both slots
+  // share one cron expression, so the caller cannot say which one fired.
+  const kind = (url.searchParams.get("kind") as Kind | null) ?? kindForHour(hour);
+
+  if (kind === null) {
+    console.log(
+      "[coaching-reminders] hour=%d belongs to neither slot - sending nothing",
+      hour,
+    );
+    return Response.json({
+      hour,
+      skipped: "outside both coaching windows",
+      windows: {
+        morning_of: `${MORNING_FROM}:00-${MORNING_TO}:59`,
+        day_before: `${EVENING_FROM}:00-${EVENING_TO}:59`,
+      },
+      sessions: 0,
+      sent: 0,
+    });
+  }
 
   const today = sgDate(now);
   const target =

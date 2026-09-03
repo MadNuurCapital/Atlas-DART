@@ -84,7 +84,13 @@ $$;
 -- Rather than repeating the URL and the header in four job definitions, the
 -- jobs call this. Changing the site address later means changing one line.
 
-create or replace function public.call_reminder(fn text)
+-- The one-argument version from an earlier run of this script must go first.
+-- Postgres keeps overloads side by side, so leaving it would make every
+-- call_reminder('push-reminders') ambiguous between the old (text) and the new
+-- (text, text DEFAULT) - and every cron job would start erroring.
+drop function if exists public.call_reminder(text);
+
+create or replace function public.call_reminder(fn text, params text default '')
 returns bigint
 language plpgsql
 security definer
@@ -105,8 +111,15 @@ begin
 
   -- The token goes in a header, never the query string: a query string is
   -- written to Netlify's request logs.
+  -- `params` exists so a caller can pass dryRun=true. Without it the only way
+  -- to exercise this path was a real run: a "safe" test call to
+  -- reminder-consultants attempted to email all fifteen people at 2 PM,
+  -- because that function only returns early while Resend is UNconfigured,
+  -- and Resend is configured now. A test must not be able to send.
   select net.http_get(
-           url     := 'https://atlasdartibw.netlify.app/.netlify/functions/' || fn,
+           url     := 'https://atlasdartibw.netlify.app/.netlify/functions/'
+                        || fn
+                        || case when params = '' then '' else '?' || params end,
            headers := jsonb_build_object(
                         'Authorization', 'Bearer ' || token,
                         'Content-Type',  'application/json'
@@ -119,7 +132,7 @@ begin
 end;
 $$;
 
-revoke all on function public.call_reminder(text) from public, anon, authenticated;
+revoke all on function public.call_reminder(text, text) from public, anon, authenticated;
 
 
 -- ---------------------------------------------------------------------------
@@ -165,15 +178,19 @@ select cron.schedule(
 -- and every call came back 401, with nothing to show for it until someone
 -- looked.
 --
--- reminder-consultants is used for the test because it sends nothing at all
--- while Resend has no verified sender - it returns early rather than
--- attempting a send it knows will fail. So this is a safe call at any hour.
+-- The test passes dryRun=true, which is the ONLY thing that makes it safe.
+--
+-- An earlier version called reminder-consultants bare, on the reasoning that
+-- it returns early while Resend has no verified sender. Resend is configured
+-- now, so it did not return early: it attempted to email all fifteen people,
+-- in the middle of the afternoon, and wrote fifteen failure rows. Never test a
+-- sender by letting it send.
 
 -- The Supabase SQL editor shows only the LAST statement's result, so the
 -- verdict is deliberately last. The job list is folded into it rather than
 -- being its own SELECT, which would have hidden the answer.
 
-select public.call_reminder('reminder-consultants') as test_request_id;
+select public.call_reminder('reminder-consultants', 'dryRun=true') as test_request_id;
 
 -- pg_net is asynchronous, so give it a moment before reading the reply.
 select pg_sleep(6);
@@ -195,8 +212,10 @@ select
   case
     when j.active_jobs < 4
       then 'STOP - expected 4 active jobs. Section 4 did not run.'
+    when r.status_code = 200 and r.content like '%"dryRun":true%'
+      then 'OK - 4 jobs scheduled, token accepted, nothing sent. The reminders will fire.'
     when r.status_code = 200
-      then 'OK - 4 jobs scheduled, token accepted. The reminders will fire.'
+      then 'Token accepted, but this reply is not from a dry run - read the content column before trusting it.'
     when r.status_code = 401
       then 'STOP - the token in Vault does not match the one in Netlify. Re-run section 2 with the correct value.'
     when r.status_code is null

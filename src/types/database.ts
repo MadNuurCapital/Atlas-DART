@@ -321,6 +321,20 @@ export type DashboardPayloadRow = {
   pending: PendingInception | null;
   mix: CaseMixByCategory[];
   coaching: unknown[];
+  cases_month: {
+    this_month: number;
+    best_start: number;
+    best_total: number;
+    last_month: number;
+    is_best_start: boolean;
+    month_label: string;
+  };
+  missed: {
+    ever_submitted: boolean;
+    last_submitted: string | null;
+    missed: number;
+    submitted_today: boolean;
+  };
 };
 
 export type Database = {
@@ -529,6 +543,18 @@ export type Database = {
       mark_notifications_read: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      /** Cases this month, against the same slice of earlier months. */
+      my_month_cases: {
+        Args: { p_as_of?: string };
+        Returns: {
+          this_month: number;
+          best_start: number;
+          best_total: number;
+          last_month: number;
+          is_best_start: boolean;
+          month_label: string;
+        };
       };
       dashboard_payload: {
         Args: {

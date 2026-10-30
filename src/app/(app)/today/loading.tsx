@@ -1,45 +1,43 @@
-import { Skeleton, SkeletonStats } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
-/** Shaped like the daily form, so the page does not jump when it arrives. */
-export default function Loading() {
+/**
+ * The shape of /today while its data is in flight.
+ *
+ * Deliberately NOT an empty form. An empty form and a day with nothing
+ * recorded look identical, and someone who typed into one while the real
+ * numbers were still arriving would overwrite them. A skeleton cannot be
+ * typed into.
+ */
+function Block({ lines }: { lines: number }) {
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4">
+    <Card>
+      <CardHeader>
+        <div className="h-5 w-32 animate-pulse rounded bg-muted" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {Array.from({ length: lines }).map((_, i) => (
+          <div key={i} className="h-10 w-full animate-pulse rounded bg-muted" />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function TodayLoading() {
+  return (
+    <div
+      className="mx-auto w-full max-w-2xl space-y-4"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="Loading your day"
+    >
       <div className="flex items-center justify-between gap-2">
-        <Skeleton className="size-11 rounded-md" />
-        <div className="space-y-1.5 text-center">
-          <Skeleton className="mx-auto h-5 w-24" />
-          <Skeleton className="mx-auto h-3 w-40" />
-        </div>
-        <Skeleton className="size-11 rounded-md" />
+        <div className="size-11" aria-hidden="true" />
+        <div className="h-6 w-40 animate-pulse rounded bg-muted" />
+        <div className="size-11" aria-hidden="true" />
       </div>
-
-      <div className="space-y-5 rounded-xl border border-border bg-card p-5">
-        <Skeleton className="h-4 w-28" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-12 w-full rounded-md" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-12 w-full rounded-md" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-12 w-full rounded-md" />
-        </div>
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <div className="flex gap-2">
-          <Skeleton className="h-14 flex-1 rounded-lg" />
-          <Skeleton className="h-14 flex-1 rounded-lg" />
-        </div>
-      </div>
-
-      <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-        <Skeleton className="h-4 w-28" />
-        <SkeletonStats count={4} />
-      </div>
+      <Block lines={4} />
+      <Block lines={2} />
     </div>
   );
 }

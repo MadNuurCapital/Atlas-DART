@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { KeyRound, Bell } from "lucide-react";
-import { requireProfile } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { requireProfile, getNagStatus } from "@/lib/auth";
 import { BottomNav } from "@/components/app-shell/bottom-nav";
 import { SideNav } from "@/components/app-shell/side-nav";
 import { SubmissionNag } from "@/components/app-shell/submission-nag";
@@ -10,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
 import { Toaster } from "@/components/ui/sonner";
 import { formatSgDate, sgToday } from "@/lib/sg-date";
-import { nagBusinessDate } from "@/lib/nag";
 
 export default async function AppLayout({
   children,
@@ -21,22 +19,12 @@ export default async function AppLayout({
   const isAdmin = profile.role === "admin";
   const today = sgToday();
 
-  // Which day the nag is about. Between midnight and 6am it is still
-  // yesterday - today has barely started and nobody owes anything for it yet.
-  const nagDate = nagBusinessDate();
 
-  // One cheap query, once, in the layout. It drives both the nag banner and
-  // the badge on the Today tab, so the answer is fetched in one place rather
-  // than on every page that wants to know.
-  const supabase = await createClient();
-  const { data: nagSubmission } = await supabase
-    .from("daily_submissions")
-    .select("status")
-    .eq("user_id", profile.id)
-    .eq("business_date", nagDate)
-    .maybeSingle();
-
-  const submittedToday = nagSubmission?.status === "submitted";
+  // Both answers come from one cached call, shared with requireProfile above.
+  // This used to be a second query of its own, on every page in the app, for
+  // a single boolean - a third of a second of transpacific latency to decide
+  // whether to draw a banner.
+  const submittedToday = (await getNagStatus()) === "submitted";
   const firstName = profile.full_name.split(" ")[0];
 
   return (

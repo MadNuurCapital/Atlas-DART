@@ -3,7 +3,16 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { nagBusinessDate } from "@/lib/nag";
 import type { Profile } from "@/types/database";
+import type { SubmissionStatus } from "@/lib/constants";
+
+/** What the shell needs before it can draw anything. */
+type Bootstrap = {
+  profile: Profile | null;
+  /** The day being chased, or null if nothing is recorded for it yet. */
+  nagStatus: SubmissionStatus | null;
+};
 
 /**
  * Who is asking.
@@ -23,7 +32,7 @@ import type { Profile } from "@/types/database";
  * and gets a fresh, revalidated answer.
  */
 
-const loadProfile = cache(async (): Promise<Profile | null> => {
+const loadBootstrap = cache(async (): Promise<Bootstrap> => {
   const supabase = await createClient();
 
   // getClaims() verifies the access token's signature before returning
@@ -39,15 +48,35 @@ const loadProfile = cache(async (): Promise<Profile | null> => {
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
 
-  if (!userId) return null;
+  if (!userId) return { profile: null, nagStatus: null };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
+  // One call for both answers the shell needs.
+  //
+  // These used to be two queries - a profiles SELECT here, and a
+  // daily_submissions lookup in the layout - and the layout renders on EVERY
+  // page. At ~330ms a trip between US East and Singapore, that second question
+  // was costing a third of a second on every navigation in the app.
+  //
+  // The nag date is computed here rather than in SQL because the rule (it
+  // means YESTERDAY between midnight and 6am) already lives in lib/nag.ts, and
+  // a second implementation in Postgres would eventually disagree with it.
+  const { data: payload, error } = await supabase.rpc("app_bootstrap", {
+    p_nag_date: nagBusinessDate(),
+  });
 
-  return profile ?? null;
+  if (error || !payload) {
+    // Deliberately not a throw. A failed read here means we cannot establish
+    // who is asking, and the only safe response to that is the login screen -
+    // which is what a null profile already produces. Throwing would replace a
+    // clean redirect with an error page on every route in the app.
+    console.error("[auth] app_bootstrap failed: %s", error?.message);
+    return { profile: null, nagStatus: null };
+  }
+
+  return {
+    profile: payload.profile,
+    nagStatus: payload.nag_status,
+  };
 });
 
 /**
@@ -58,7 +87,7 @@ const loadProfile = cache(async (): Promise<Profile | null> => {
  * "authenticated but no profile row" case is handled in exactly one place.
  */
 export async function requireProfile(): Promise<Profile> {
-  const profile = await loadProfile();
+  const { profile } = await loadBootstrap();
 
   if (!profile) {
     // Either no session, or authenticated with no profile row. The second
@@ -86,5 +115,17 @@ export async function requireAdmin(): Promise<Profile> {
 
 /** The profile if signed in, otherwise null. Does not redirect. */
 export async function getProfile(): Promise<Profile | null> {
-  return loadProfile();
+  return (await loadBootstrap()).profile;
+}
+
+/**
+ * Whether the day currently being chased has been submitted.
+ *
+ * Shares the cached bootstrap call with requireProfile(), so the layout gets
+ * this for free rather than paying a second round trip for it. Null means
+ * nothing is recorded for that day at all, which the banner treats the same as
+ * a draft: not submitted.
+ */
+export async function getNagStatus(): Promise<SubmissionStatus | null> {
+  return (await loadBootstrap()).nagStatus;
 }

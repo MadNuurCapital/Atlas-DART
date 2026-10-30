@@ -42,13 +42,19 @@ export function TeamCelebrations({ myId }: { myId: string }) {
           // Your own case. The dialog already said it better.
           if (row.actor_id === myId) return;
 
-          toast.success(`${row.actor_name} just submitted a case!`, {
+          const firstName = row.actor_name.split(" ")[0] ?? row.actor_name;
+
+          toast.success(`🎉 Congratulations ${firstName}!`, {
             // Keyed by the event id so a redelivered message - which the
             // realtime client will do after a reconnection - replaces the
             // toast rather than stacking a second one beside it.
             id: row.id,
-            description: "Another one for the team.",
-            duration: 6000,
+            description: "Another case submitted for the team.",
+            // Long enough to read and recognise, short enough that it never
+            // sits over the form somebody is filling in. The same win is
+            // waiting under the bell afterwards, so nothing is lost by it
+            // going away.
+            duration: 5000,
           });
 
           // The bell's unread count and the feed below it both live in a

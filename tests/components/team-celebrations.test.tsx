@@ -75,7 +75,7 @@ describe("team celebrations", () => {
     deliver(COLLEAGUE, "Zul Advisor");
 
     expect(success).toHaveBeenCalledTimes(1);
-    expect(success.mock.calls[0]![0]).toBe("Zul Advisor just submitted a case!");
+    expect(success.mock.calls[0]![0]).toBe("🎉 Congratulations Zul!");
   });
 
   it("says nothing to the person who submitted it", async () => {
@@ -93,7 +93,7 @@ describe("team celebrations", () => {
 
     // The filter must skip the event, not stop listening.
     expect(success).toHaveBeenCalledTimes(1);
-    expect(success.mock.calls[0]![0]).toBe("Zul Advisor just submitted a case!");
+    expect(success.mock.calls[0]![0]).toBe("🎉 Congratulations Zul!");
   });
 
   it("keys the toast by event id, so a redelivery replaces rather than stacks", async () => {
@@ -101,6 +101,19 @@ describe("team celebrations", () => {
     deliver(COLLEAGUE, "Zul Advisor", "event-7");
 
     expect(success.mock.calls[0]![1]).toMatchObject({ id: "event-7" });
+  });
+
+  it("uses the first name only, and dismisses itself after 5 seconds", async () => {
+    await mount();
+    deliver(COLLEAGUE, "Muhammad Faisal bin Abdullah");
+
+    // "Congratulations Muhammad Faisal bin Abdullah!" is not how anybody
+    // congratulates anybody.
+    expect(success.mock.calls[0]![0]).toBe("🎉 Congratulations Muhammad!");
+
+    // Long enough to read, short enough never to sit over a form somebody is
+    // filling in. The same win waits under the bell afterwards.
+    expect(success.mock.calls[0]![1]).toMatchObject({ duration: 5000 });
   });
 
   it("refreshes so the bell and the feed catch up", async () => {

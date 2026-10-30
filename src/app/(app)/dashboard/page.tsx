@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleCheck, CircleAlert, ArrowRight } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
-import { unwrap } from "@/lib/query";
-import { fetchMyCoaching } from "@/lib/coaching";
+import type { DashboardPayload } from "@/lib/dashboard-payload";
 import { CoachingCard } from "@/components/coaching/coaching-card";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,12 +23,6 @@ import {
   YearTargetTile,
 } from "@/components/dashboard/target-panel";
 import { CaseMixPanel } from "@/components/dashboard/case-mix-panel";
-import type {
-  CaseMixByCategory,
-  DailyConsultantSummary,
-  PendingInception,
-  TargetShortfall,
-} from "@/types/database";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -62,49 +55,47 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  // Today's row is NOT fetched separately. The range below runs to `today`
-  // inclusive, so it already contains it - asking for it again was a whole
-  // extra round trip to a database on the other side of the world, for a row
-  // that was about to arrive anyway. On this deployment that is roughly 300ms
-  // off the most-visited page in the app, for nothing.
-  const [monthRes, targetRes, pendingRes, mixRes, coaching] =
-    await Promise.all([
-      supabase
-        .from("v_daily_consultant_summary")
-        .select("*")
-        .eq("user_id", profile.id)
-        .gte("business_date", readFrom)
-        .lte("business_date", today),
-      supabase
-        .from("v_target_shortfall")
-        .select("*")
-        .eq("consultant_id", profile.id)
-        .maybeSingle(),
-      supabase
-        .from("v_pending_inception")
-        .select("*")
-        .eq("consultant_id", profile.id)
-        .maybeSingle(),
-      supabase
-        .from("v_case_mix_by_category")
-        .select("*")
-        .eq("consultant_id", profile.id)
-        .eq("year", year)
-        .eq("month", month),
-      // Throws on a failed read rather than rendering as "no coaching booked",
-      // which would look identical to genuinely having none.
-      fetchMyCoaching(supabase),
-    ]);
+  // ONE round trip, not five.
+  //
+  // The app runs in Netlify's US East region; the database is in Singapore. A
+  // query costs about 330ms here and almost all of it is distance, not work.
+  // Issued in parallel these five still did not overlap cleanly - three
+  // measured 764ms against the ~330ms one costs - because each needs its own
+  // trip through the pooler. So the most-visited page in the app spent roughly
+  // a second waiting on the speed of light.
+  //
+  // dashboard_payload asks the same five questions, of the same four views,
+  // with the same filters, and returns one JSON document. It is SECURITY
+  // INVOKER and reads auth.uid(), so Row Level Security decides what comes
+  // back exactly as it did before. tests/db/dashboard-payload.test.ts proves
+  // old and new agree column for column.
+  const { data: payload, error: payloadError } = await supabase.rpc(
+    "dashboard_payload",
+    {
+      p_from: readFrom,
+      p_to: today,
+      p_year: year,
+      p_month: month,
+    },
+  );
 
   // A failed read must not render as a zero. Showing S$0 to someone who has
   // written business this month is worse than an error screen, because they
   // have no way to tell it apart from the truth.
-  const monthRows = unwrap(monthRes, "this month's submissions");
-  const targetRow = unwrap(targetRes, "your target");
-  const pendingRow = unwrap(pendingRes, "pending inceptions");
-  const mixRows = unwrap(mixRes, "the category mix");
+  if (payloadError || !payload) {
+    throw new Error(
+      `Could not load your dashboard: ${payloadError?.message ?? "no data returned"}`,
+    );
+  }
 
-  const fetched = (monthRows as DailyConsultantSummary[]) ?? [];
+  const data = payload as DashboardPayload;
+
+  const targetRow = data.target;
+  const pendingRow = data.pending;
+  const mixRows = data.mix;
+  const coaching = data.coaching;
+
+  const fetched = data.days;
 
   // Today, picked out of the range rather than fetched again. Undefined here
   // means the row genuinely does not exist yet - nothing has been recorded
@@ -125,7 +116,7 @@ export default async function DashboardPage() {
   const isSubmitted = summary?.status === "submitted";
   const firstName = profile.full_name.split(" ")[0] ?? profile.full_name;
 
-  const targetRow_ = (targetRow as TargetShortfall | null) ?? null;
+  const targetRow_ = targetRow;
   const yesterdayMissing =
     fetched.find((r) => r.business_date === yesterday)?.status !== "submitted";
 
@@ -278,14 +269,14 @@ export default async function DashboardPage() {
       </Card>
 
       <CaseMixPanel
-        rows={(mixRows as CaseMixByCategory[]) ?? []}
+        rows={mixRows}
         className="sm:col-span-2 lg:col-span-4"
       />
 
       {targetRow_ && (
         <YearTargetTile
           target={targetRow_}
-          pending={(pendingRow as PendingInception | null) ?? null}
+          pending={pendingRow}
           className="lg:col-span-2"
         />
       )}

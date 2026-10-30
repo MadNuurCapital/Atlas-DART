@@ -309,6 +309,20 @@ export type MonthlyComplianceRow = {
 type InsertOf<T, Generated extends keyof T> = Omit<T, Generated> &
   Partial<Pick<T, Generated>>;
 
+/**
+ * The JSON `dashboard_payload()` returns. Structurally the same as
+ * DashboardPayload in lib/dashboard-payload.ts, which is where the consuming
+ * code imports it from; this alias exists only so the Database type can name
+ * it without importing from lib and creating a cycle.
+ */
+export type DashboardPayloadRow = {
+  days: DailyConsultantSummary[];
+  target: TargetShortfall | null;
+  pending: PendingInception | null;
+  mix: CaseMixByCategory[];
+  coaching: unknown[];
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -456,6 +470,24 @@ export type Database = {
       monthly_compliance: {
         Args: { p_year: number; p_month: number };
         Returns: MonthlyComplianceRow[];
+      };
+      /**
+       * Everything the consultant dashboard needs, in one round trip rather
+       * than five. Declared here so the call is type-checked like any other,
+       * rather than cast through `unknown` at the call site.
+       *
+       * The return type lives in lib/dashboard-payload.ts beside the code that
+       * consumes it; repeating the shape here would give two places to forget
+       * to update.
+       */
+      dashboard_payload: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_year: number;
+          p_month: number;
+        };
+        Returns: DashboardPayloadRow;
       };
     };
     Enums: Record<string, never>;

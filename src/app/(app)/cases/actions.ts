@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { announceCaseToTeam } from "@/lib/push/team";
 import { requireProfile, requireAdmin } from "@/lib/auth";
 import { recordAudit, auditSnapshot } from "@/lib/audit";
 import {
@@ -150,6 +152,19 @@ export async function createCase(
       0,
     );
   }
+
+  // Tell the team, on their phones.
+  //
+  // after() runs this once the response has already been sent, so nobody waits
+  // on fourteen push deliveries to find out their case saved. The function
+  // swallows its own failures; the case is saved either way, and a celebration
+  // must never be able to cost somebody a submission again.
+  after(() =>
+    announceCaseToTeam({
+      actorId: profile.id,
+      actorName: profile.full_name,
+    }),
+  );
 
   return {
     ok: true,

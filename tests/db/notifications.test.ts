@@ -245,7 +245,7 @@ describe("the notification centre", () => {
 
       expect(items).toHaveLength(2);
       expect(items[0]!.source).toBe("team");
-      expect(items[0]!.title).toBe("Zul Advisor just submitted a case!");
+      expect(items[0]!.title).toBe("🎉 Congratulations Zul!");
       expect(items[1]!.title).toBe("Older personal note");
     });
   });

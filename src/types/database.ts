@@ -480,6 +480,17 @@ export type Database = {
        * consumes it; repeating the shape here would give two places to forget
        * to update.
        */
+      /**
+       * The app shell's two questions in one round trip. Renders on every
+       * page, so this saves more total latency than the dashboard change did.
+       */
+      app_bootstrap: {
+        Args: { p_nag_date: string };
+        Returns: {
+          profile: Profile | null;
+          nag_status: SubmissionStatus | null;
+        };
+      };
       dashboard_payload: {
         Args: {
           p_from: string;

@@ -23,7 +23,8 @@ import {
   YearTargetTile,
 } from "@/components/dashboard/target-panel";
 import { CaseMixPanel } from "@/components/dashboard/case-mix-panel";
-import { StreakTile } from "@/components/dashboard/streak-tile";
+import { MonthCasesTile } from "@/components/dashboard/month-cases-tile";
+import { MissedDaysNotice } from "@/components/dashboard/missed-days-notice";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -138,6 +139,14 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {/* Above everything, and only when there is something to say. Somebody
+          who has stopped submitting should see that before they see anything
+          congratulating them. */}
+      <MissedDaysNotice
+        missed={data.missed}
+        className="sm:col-span-2 lg:col-span-6"
+      />
+
       <Card
         className={
           isSubmitted
@@ -235,11 +244,10 @@ export default async function DashboardPage() {
         <MonthTargetTile target={targetRow_} className="lg:col-span-2" />
       )}
 
-      {/* Beside the target rather than above it. The streak is encouragement;
-          the target is the number that matters. Putting the streak first would
-          say the app cares more about the habit than the business. */}
-      <StreakTile
-        streaks={data.streaks}
+      {/* Beside the target rather than above it. The count is encouragement;
+          the target is the number that matters. */}
+      <MonthCasesTile
+        cases={data.cases_month}
         className="sm:col-span-2 lg:col-span-4"
       />
 

@@ -29,6 +29,10 @@ export type CaseCelebration = {
   /** Their active GR for the month this case counts in, including this one. */
   monthToDateGr: number;
   monthLabel: string;
+  /** How many cases they have written this month, this one included. */
+  monthCaseCount: number;
+  /** True when that count beats their best start to any previous month. */
+  isBestStart: boolean;
 };
 
 export type CaseActionResult = {
@@ -133,6 +137,7 @@ export async function createCase(
   const monthEnd = lastDayOfMonth(created.date_submitted);
 
   let monthToDateGr = 0;
+  let monthCaseCount = 0;
   const { data: monthCases, error: totalError } = await supabase
     .from("cases")
     .select("gr_amount")
@@ -151,6 +156,26 @@ export async function createCase(
       (sum, row) => sum + Number(row.gr_amount ?? 0),
       0,
     );
+    monthCaseCount = (monthCases ?? []).length;
+  }
+
+  // Is this their best start to a month? Asked AFTER the insert, so the new
+  // case is counted, and read from the database rather than inferred here -
+  // the same reasoning as the GR total above. A failure costs the line in the
+  // dialog, never the case.
+  let isBestStart = false;
+  const { data: monthStats, error: statsError } = await supabase.rpc(
+    "my_month_cases",
+    {},
+  );
+
+  if (statsError) {
+    console.error(
+      "[cases] case saved but the month comparison failed: %s",
+      statsError.message,
+    );
+  } else if (monthStats) {
+    isBestStart = monthStats.is_best_start;
   }
 
   // Tell the team, on their phones.
@@ -175,6 +200,8 @@ export async function createCase(
       grAmount: Number(created.gr_amount ?? 0),
       monthToDateGr,
       monthLabel: monthNameOf(created.date_submitted),
+      monthCaseCount,
+      isBestStart,
     },
   };
 }

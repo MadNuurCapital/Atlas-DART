@@ -76,6 +76,23 @@ export function CaseCelebrationDialog({
                 </span>
                 .
               </p>
+
+              {/* The count, and the record if there is one.
+                  This is where the personal best lands rather than in a
+                  notification: the advisor has just done the thing, so it is
+                  the moment it means most, and it costs nothing on top of the
+                  push every colleague is already getting for this case. */}
+              <p
+                className={
+                  c.isBestStart
+                    ? "rounded-xl bg-status-present/10 px-3 py-2 text-sm font-medium text-status-present"
+                    : "text-sm text-muted-foreground"
+                }
+              >
+                {c.isBestStart
+                  ? `That's ${c.monthCaseCount} this month — your best start yet.`
+                  : `That's ${c.monthCaseCount} ${c.monthCaseCount === 1 ? "case" : "cases"} this month.`}
+              </p>
             </div>
 
             <Button type="button" onClick={onClose} className="mt-2 w-full">

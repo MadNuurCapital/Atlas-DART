@@ -211,18 +211,18 @@ describe("the notification centre", () => {
 
       await actAs(client, mine.id);
       const { rows } = await client.query(
-        "select public.notification_feed(50) as f",
+        "select public.notification_feed(15) as f",
       );
 
-      const titles = (rows[0].f.items as { title: string }[]).map(
+      const titles = (rows[0].f.personal as { title: string }[]).map(
         (i) => i.title,
       );
-      expect(titles).toContain("Your streak reached 5 days");
-      expect(titles).not.toContain("Secret to me");
+      expect(titles).toEqual(["Your streak reached 5 days"]);
+      expect(JSON.stringify(rows[0].f)).not.toContain("Secret to me");
     });
   });
 
-  it("merges team events and personal notifications, newest first", async () => {
+  it("returns yours and the team's separately, not merged", async () => {
     await withRollback(async (client) => {
       const zul = await seedUser(client, { fullName: "Zul Advisor" });
       const siti = await seedUser(client);
@@ -230,23 +230,124 @@ describe("the notification centre", () => {
 
       await asOwner(client);
       await client.query(
-        `insert into public.notifications
-           (user_id, kind, title, dedupe_key, created_at)
-         values ($1, 'streak', 'Older personal note', 'k1', now() - interval '1 hour')`,
+        `insert into public.notifications (user_id, kind, title, dedupe_key)
+         values ($1, 'milestone', 'Your best month yet', 'k1')`,
         [siti.id],
       );
       await seedCase(client, zul.id, insurer);
 
       await actAs(client, siti.id);
       const { rows } = await client.query(
-        "select public.notification_feed(50) as f",
+        "select public.notification_feed(15) as f",
       );
-      const items = rows[0].f.items as { title: string; source: string }[];
 
-      expect(items).toHaveLength(2);
-      expect(items[0]!.source).toBe("team");
-      expect(items[0]!.title).toBe("🎉 Congratulations Zul!");
-      expect(items[1]!.title).toBe("Older personal note");
+      // Personal items sit above the feed rather than competing with it; one
+      // achievement buried among forty celebrations is one nobody sees.
+      expect(rows[0].f.personal).toHaveLength(1);
+      expect(rows[0].f.team).toHaveLength(1);
+      expect(rows[0].f.team[0].name).toBe("Zul");
+    });
+  });
+
+  it("collapses a person's whole day into one row", async () => {
+    await withRollback(async (client) => {
+      const zul = await seedUser(client, { fullName: "Zul Advisor" });
+      const siti = await seedUser(client);
+      const insurer = await seedInsurer(client);
+
+      // The real pattern that prompted this: a batch entered in one sitting.
+      for (let i = 0; i < 5; i += 1) {
+        await seedCase(client, zul.id, insurer);
+      }
+
+      await actAs(client, siti.id);
+      const { rows } = await client.query(
+        "select public.notification_feed(15) as f",
+      );
+
+      expect(rows[0].f.team).toHaveLength(1);
+      expect(rows[0].f.team[0].name).toBe("Zul");
+      expect(Number(rows[0].f.team[0].cases)).toBe(5);
+    });
+  });
+
+  it("keeps two different people on two different rows", async () => {
+    await withRollback(async (client) => {
+      const zul = await seedUser(client, { fullName: "Zul Advisor" });
+      const afiq = await seedUser(client, { fullName: "Afiq Advisor" });
+      const siti = await seedUser(client);
+      const insurer = await seedInsurer(client);
+
+      await seedCase(client, zul.id, insurer);
+      await seedCase(client, zul.id, insurer);
+      await seedCase(client, afiq.id, insurer);
+
+      await actAs(client, siti.id);
+      const { rows } = await client.query(
+        "select public.notification_feed(15) as f",
+      );
+
+      const byName = Object.fromEntries(
+        (rows[0].f.team as { name: string; cases: number }[]).map((t) => [
+          t.name,
+          Number(t.cases),
+        ]),
+      );
+      expect(byName).toEqual({ Zul: 2, Afiq: 1 });
+    });
+  });
+
+  it("splits a person across two days, by the Singapore clock", async () => {
+    await withRollback(async (client) => {
+      const zul = await seedUser(client, { fullName: "Zul Advisor" });
+      const siti = await seedUser(client);
+      const insurer = await seedInsurer(client);
+
+      await seedCase(client, zul.id, insurer);
+      await seedCase(client, zul.id, insurer);
+
+      // Push one event back a day. The grouping must use Singapore's calendar:
+      // a case entered at 11:35 pm belongs to that evening's work, not to the
+      // next day because UTC had already rolled over.
+      await asOwner(client);
+      await client.query(
+        `update public.team_events
+            set created_at = created_at - interval '1 day'
+          where id = (select id from public.team_events order by created_at limit 1)`,
+      );
+
+      await actAs(client, siti.id);
+      const { rows } = await client.query(
+        "select public.notification_feed(15) as f",
+      );
+
+      expect(rows[0].f.team).toHaveLength(2);
+      expect(
+        (rows[0].f.team as { cases: number }[]).map((t) => Number(t.cases)),
+      ).toEqual([1, 1]);
+    });
+  });
+
+  it("bounds the list and says how many more there are", async () => {
+    await withRollback(async (client) => {
+      const siti = await seedUser(client);
+      const insurer = await seedInsurer(client);
+
+      // Six colleagues, so six groups.
+      for (let i = 0; i < 6; i += 1) {
+        const other = await seedUser(client, { fullName: `Person${i} X` });
+        await seedCase(client, other.id, insurer);
+      }
+
+      await actAs(client, siti.id);
+      const { rows } = await client.query(
+        "select public.notification_feed(2) as f",
+      );
+
+      expect(rows[0].f.team).toHaveLength(2);
+      // The total counts GROUPS, not cases: the button should appear when
+      // there are more ROWS to show.
+      expect(Number(rows[0].f.team_total)).toBe(6);
     });
   });
 
@@ -268,7 +369,7 @@ describe("the notification centre", () => {
         "select public.notification_feed(5) as f",
       );
 
-      expect(rows[0].f.items).toHaveLength(5);
+      expect(rows[0].f.personal).toHaveLength(5);
       // A badge reading 5 when there are 12 unread would be worse than none.
       expect(Number(rows[0].f.unread)).toBe(12);
     });
@@ -283,13 +384,13 @@ describe("the notification centre", () => {
 
       await actAs(client, siti.id);
       const { rows } = await client.query(
-        "select public.notification_feed(50) as f",
+        "select public.notification_feed(15) as f",
       );
 
       // The bell is for things addressed to you. A shared row has no
       // per-person read state and would otherwise never clear.
       expect(Number(rows[0].f.unread)).toBe(0);
-      expect(rows[0].f.items).toHaveLength(1);
+      expect(rows[0].f.team).toHaveLength(1);
     });
   });
 

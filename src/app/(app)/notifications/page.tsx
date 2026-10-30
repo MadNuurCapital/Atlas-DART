@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { EnablePush } from "@/components/notifications/enable-push";
+import { NotificationList } from "@/components/notifications/notification-list";
+import { MarkAllRead } from "@/components/notifications/mark-all-read";
+import { fetchNotificationFeed } from "@/lib/notification-feed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata: Metadata = { title: "Reminders" };
+export const metadata: Metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
 
 const SCHEDULE = [
@@ -41,10 +44,43 @@ export default async function NotificationsPage() {
 
   const count = devices?.length ?? 0;
 
+  // The centre itself. One round trip, already paid for by the bell in the
+  // layout - this asks for the full page of items rather than just the count.
+  const feed = await fetchNotificationFeed(50);
+
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
       <div>
-        <h1 className="text-lg font-semibold">Reminders</h1>
+        <h1 className="text-lg font-semibold">Notifications</h1>
+        <p className="text-sm text-muted-foreground">
+          Your achievements, and the team&rsquo;s wins.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardTitle className="text-base">
+            Recent
+            {feed.unread > 0 && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {feed.unread} unread
+              </span>
+            )}
+          </CardTitle>
+          {feed.unread > 0 && <MarkAllRead />}
+        </CardHeader>
+        <CardContent className="pt-0">
+          <NotificationList items={feed.items} />
+        </CardContent>
+      </Card>
+
+      {/* The reminder schedule and devices stay on this page rather than
+          moving somewhere else. People now come here to see their wins, and
+          the control that turns notifications ON is the thing most of them
+          have never found - a bell icon nobody notices was the whole reason
+          two advisors went months without a registered device. */}
+      <div className="pt-2">
+        <h2 className="text-lg font-semibold">Reminders</h2>
         <p className="text-sm text-muted-foreground">
           So you never lose a day to forgetting.
         </p>

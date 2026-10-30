@@ -138,3 +138,27 @@ export async function sendTestPush(): Promise<PushResult> {
     message: `Sent to ${delivered} device${delivered === 1 ? "" : "s"}.`,
   };
 }
+
+/**
+ * Mark everything in the caller's notification centre as read.
+ *
+ * The update happens in Postgres (mark_notifications_read), not here, so that
+ * "read" can only ever move in one direction and nothing else on the row can
+ * be touched on the way past. RLS would already confine it to the caller's own
+ * rows; the function confines it to the one column that is theirs to change.
+ */
+export async function markAllNotificationsRead(): Promise<void> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("mark_notifications_read");
+
+  if (error) {
+    // Not thrown. Failing to clear a badge is a small disappointment; an error
+    // screen in place of the page someone opened to see their wins is worse.
+    console.error("[notifications] mark read failed: %s", error.message);
+    return;
+  }
+
+  revalidatePath("/notifications");
+  revalidatePath("/", "layout");
+}

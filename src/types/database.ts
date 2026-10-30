@@ -508,6 +508,28 @@ export type Database = {
           compliance: MonthlyComplianceRow[];
         };
       };
+      /** The notification centre: both streams merged, plus the unread count. */
+      notification_feed: {
+        Args: { p_limit?: number };
+        Returns: {
+          items: {
+            id: string;
+            source: "personal" | "team";
+            kind: string;
+            title: string;
+            body: string | null;
+            url: string | null;
+            read: boolean;
+            created_at: string;
+          }[];
+          unread: number | string;
+        };
+      };
+      /** Marks all the caller's unread notifications read. Returns the count. */
+      mark_notifications_read: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
       dashboard_payload: {
         Args: {
           p_from: string;

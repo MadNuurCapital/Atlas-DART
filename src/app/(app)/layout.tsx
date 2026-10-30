@@ -8,6 +8,8 @@ import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
 import { Toaster } from "@/components/ui/sonner";
+import { TeamCelebrations } from "@/components/notifications/team-celebrations";
+import { fetchNotificationFeed } from "@/lib/notification-feed";
 import { formatSgDate, sgToday } from "@/lib/sg-date";
 
 export default async function AppLayout({
@@ -26,6 +28,11 @@ export default async function AppLayout({
   // whether to draw a banner.
   const submittedToday = (await getNagStatus()) === "submitted";
   const firstName = profile.full_name.split(" ")[0];
+
+  // Only the count is needed up here, but the feed comes back with it in the
+  // same round trip, so asking for the badge costs nothing the centre was not
+  // already paying.
+  const { unread } = await fetchNotificationFeed(1);
 
   return (
     // spatial-wash paints two fixed pools of brand colour behind everything.
@@ -55,9 +62,27 @@ export default async function AppLayout({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/notifications" aria-label="Reminder settings">
+            <Button asChild variant="ghost" size="sm" className="relative">
+              <Link
+                href="/notifications"
+                aria-label={
+                  unread > 0
+                    ? `Notifications, ${unread} unread`
+                    : "Notifications"
+                }
+              >
                 <Bell aria-hidden="true" />
+                {unread > 0 && (
+                  // Capped at 9+: the badge is a nudge to look, not a figure
+                  // anybody needs to read precisely, and three digits would
+                  // not fit beside the icon.
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground"
+                  >
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
               </Link>
             </Button>
 
@@ -85,6 +110,7 @@ export default async function AppLayout({
       </div>
 
       <BottomNav needsSubmission={!submittedToday} />
+      <TeamCelebrations myId={profile.id} />
       <Toaster />
     </div>
   );

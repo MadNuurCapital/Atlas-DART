@@ -526,9 +526,8 @@ export type Database = {
       notification_feed: {
         Args: { p_limit?: number };
         Returns: {
-          items: {
+          personal: {
             id: string;
-            source: "personal" | "team";
             kind: string;
             title: string;
             body: string | null;
@@ -536,6 +535,15 @@ export type Database = {
             read: boolean;
             created_at: string;
           }[];
+          /** One row per colleague per Singapore day, not per case. */
+          team: {
+            actor_id: string;
+            name: string;
+            sg_day: string;
+            cases: number;
+            latest: string;
+          }[];
+          team_total: number | string;
           unread: number | string;
         };
       };

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { EnablePush } from "@/components/notifications/enable-push";
-import { NotificationList } from "@/components/notifications/notification-list";
+import { NotificationCentre } from "@/components/notifications/notification-centre";
 import { MarkAllRead } from "@/components/notifications/mark-all-read";
 import { fetchNotificationFeed } from "@/lib/notification-feed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +19,18 @@ const SCHEDULE = [
   ["6:00 AM", "Your admin gets the list of who missed"],
 ] as const;
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
   const profile = await requireProfile();
+
+  // "Show more" widens the window rather than paginating. With fifteen people
+  // the whole history is small; what mattered was not opening the page with
+  // all of it.
+  const { show } = await searchParams;
+  const limit = Math.min(Math.max(Number(show) || 15, 15), 200);
   const supabase = await createClient();
 
   const { data: devices, error } = await supabase
@@ -46,7 +56,7 @@ export default async function NotificationsPage() {
 
   // The centre itself. One round trip, already paid for by the bell in the
   // layout - this asks for the full page of items rather than just the count.
-  const feed = await fetchNotificationFeed(50);
+  const feed = await fetchNotificationFeed(limit);
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
@@ -70,7 +80,12 @@ export default async function NotificationsPage() {
           {feed.unread > 0 && <MarkAllRead />}
         </CardHeader>
         <CardContent className="pt-0">
-          <NotificationList items={feed.items} />
+          <NotificationCentre
+            personal={feed.personal}
+            team={feed.team}
+            teamTotal={feed.teamTotal}
+            limit={limit}
+          />
         </CardContent>
       </Card>
 

@@ -37,7 +37,25 @@ describe("RLS harness integrity", () => {
     });
   });
 
-  it("has row level security forced on every user table", async () => {
+  /**
+   * Every table a USER writes must force RLS, so that a mistake at owner level
+   * cannot quietly read or write past the policies.
+   *
+   * Two tables are exempt, by name, and the list is deliberately hard to add
+   * to. team_events and notifications are written only by the server - a
+   * SECURITY DEFINER trigger running as the table's owner - and have no insert
+   * policy for anybody. FORCE binds precisely that path, so it guaranteed the
+   * one intended writer would be refused. It took a production outage to find,
+   * because this harness grants BYPASSRLS to the owning role and BYPASSRLS
+   * defeats FORCE, so the trigger ran fine here and nowhere else.
+   *
+   * Nothing is weaker for the exemption: RLS stays ENABLED on both, and
+   * tests/db/celebration-cannot-block.test.ts proves a signed-in user still
+   * cannot insert into either.
+   */
+  const WRITTEN_ONLY_BY_THE_SERVER = ["team_events", "notifications"];
+
+  it("has row level security forced on every table a user writes", async () => {
     await withRollback(async (c) => {
       await asOwner(c);
       const { rows } = await c.query<{ relname: string; forced: boolean }>(
@@ -48,8 +66,30 @@ describe("RLS harness integrity", () => {
           order by relname`,
       );
       expect(rows.length).toBeGreaterThanOrEqual(8);
+
       for (const row of rows) {
+        if (WRITTEN_ONLY_BY_THE_SERVER.includes(row.relname)) continue;
         expect(row.forced, `${row.relname} must force RLS`).toBe(true);
+      }
+    });
+  });
+
+  it("keeps row level security ENABLED on the exempt tables", async () => {
+    await withRollback(async (c) => {
+      await asOwner(c);
+      const { rows } = await c.query<{ relname: string; enabled: boolean }>(
+        `select relname, relrowsecurity as enabled
+           from pg_class
+          where relnamespace = 'public'::regnamespace
+            and relname = any($1)`,
+        [WRITTEN_ONLY_BY_THE_SERVER],
+      );
+
+      // Exempt from FORCE is not exempt from RLS. Dropping that distinction
+      // would open both tables to every signed-in user.
+      expect(rows).toHaveLength(WRITTEN_ONLY_BY_THE_SERVER.length);
+      for (const row of rows) {
+        expect(row.enabled, `${row.relname} must still enable RLS`).toBe(true);
       }
     });
   });

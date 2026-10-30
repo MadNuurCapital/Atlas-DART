@@ -46,12 +46,26 @@ events as (
 
 -- Cases submitted recently, and whether each got an event. This is the one
 -- that separates "nothing was written" from "written but not delivered".
+--
+-- Cases from BEFORE the trigger existed are counted separately. They have no
+-- event and never could have - the trigger was added in 0026, days after the
+-- app had been recording cases normally - and reporting them as failures sends
+-- somebody hunting a bug that is not there. Only a case submitted AFTER the
+-- first event ever written should have been announced.
 pairs as (
   select
     (select count(*) from public.cases)        as cases_total,
     count(*)                                   as cases_recent,
     count(e.id)                                as with_event,
-    count(*) - count(e.id)                     as without_event
+    count(*) filter (
+      where e.id is null
+        and c.created_at > (select min(created_at) from public.team_events)
+    )                                          as missed_since_trigger,
+    count(*) filter (
+      where e.id is null
+        and c.created_at <= coalesce(
+              (select min(created_at) from public.team_events), now())
+    )                                          as predate_trigger
   from public.cases c
   left join public.team_events e on e.case_id = c.id
   where c.created_at > now() - interval '2 days'
@@ -121,13 +135,16 @@ report as (
 
   union all
   select 4, '4. CASES vs EVENTS',
-         p.cases_recent || ' cases in 2 days, ' || p.with_event ||
-           ' announced, ' || p.without_event || ' not',
+         p.cases_recent || ' cases in 2 days: ' || p.with_event ||
+           ' announced, ' || p.predate_trigger || ' predate the trigger, ' ||
+           p.missed_since_trigger || ' genuinely missed',
          case
            when p.cases_recent = 0
              then 'No cases submitted in the last 2 days, so there was nothing to announce.'
-           when p.without_event > 0
-             then 'STOP - ' || p.without_event || ' case(s) saved with no event. The trigger is failing silently. Check the Postgres log for "could not announce".'
+           when p.missed_since_trigger > 0
+             then 'STOP - ' || p.missed_since_trigger || ' case(s) submitted AFTER the trigger started working were not announced. Run diagnose-celebration-timeline.sql to see which, and check the Postgres log for "could not announce".'
+           when p.predate_trigger > 0
+             then 'OK - every case since the trigger started working was announced. The ' || p.predate_trigger || ' without an event were submitted before it existed, which is expected. The writing side is working, so the problem is DELIVERY - see below.'
            else 'OK - every recent case was announced. The writing side is working, so the problem is DELIVERY - see below.'
          end
   from pairs p

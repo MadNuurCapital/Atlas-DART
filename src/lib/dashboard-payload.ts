@@ -8,7 +8,7 @@ import type { CoachingWithNames } from "@/lib/coaching";
 
 /**
  * Cases written this month, with the same slice of earlier months to compare
- * against. Derived on every read - see 0032_month_cases.sql for why a stored
+ * against. Derived on every read - see 0031_month_cases.sql for why a stored
  * counter would drift, and why the comparison is made at the same point in the
  * month rather than against a finished total.
  */

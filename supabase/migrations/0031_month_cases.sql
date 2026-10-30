@@ -1,13 +1,14 @@
 -- ===========================================================================
--- 0032_month_cases.sql
+-- 0031_month_cases.sql
 --
 -- Cases this month, against your own best start. And the days you have missed.
 -- ===========================================================================
 --
--- This replaces the submission streak from 0031. A streak measured whether
--- somebody had filled in a form - an administrative habit, and really a thing
--- management wants. Cases are business they actually wrote. That is what an
--- advisor is proud of, and it is what belongs at the top of their dashboard.
+-- This replaces a submission streak that was written and then withdrawn before
+-- it ever reached production. A streak measured whether somebody had filled in
+-- a form - an administrative habit, and really a thing management wants. Cases
+-- are business they actually wrote. That is what an advisor is proud of, and it
+-- is what belongs at the top of their dashboard.
 --
 --
 -- WHY "BEST AT THIS POINT IN THE MONTH" AND NOT "BEST MONTH"
@@ -270,7 +271,9 @@ as $$
 $$;
 
 
--- The streak is gone. Dropped rather than left behind: an unused function
--- that still compiles is the kind of thing somebody wires back up in a year
--- without knowing it was deliberately retired.
+-- Defensive. The withdrawn streak migration was circulated before it was
+-- replaced, so a database may have had my_streaks() applied by hand. A no-op
+-- where it was not, and a tidy-up where it was: an unused function that still
+-- compiles is the kind of thing somebody wires back up in a year without
+-- knowing it was deliberately retired.
 drop function if exists public.my_streaks();

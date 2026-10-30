@@ -96,6 +96,17 @@ export async function createCase(
     .single();
 
   if (error || !data) {
+    // Logged, not just shown. "That case could not be saved" is the right
+    // thing to tell an advisor - they cannot act on a SQLSTATE - but it is
+    // useless to whoever has to find out why, and for a while it was the only
+    // trace that a trigger was rolling every case back. The reason belongs in
+    // the server log even though it does not belong on the screen.
+    console.error(
+      "[cases] insert failed for %s: %s (%s)",
+      profile.id,
+      error?.message ?? "no row returned",
+      error?.code ?? "unknown",
+    );
     return { ok: false, message: "That case could not be saved." };
   }
 

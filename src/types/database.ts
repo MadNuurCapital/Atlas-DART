@@ -491,6 +491,23 @@ export type Database = {
           nag_status: SubmissionStatus | null;
         };
       };
+      /** /today in one round trip: the submission and its appointment rows. */
+      day_payload: {
+        Args: { p_date: string };
+        Returns: {
+          submission: DailySubmission | null;
+          appointments: AppointmentActivity[];
+        };
+      };
+      /** The admin overview in one round trip. */
+      admin_overview: {
+        Args: { p_date: string; p_year: number; p_month: number };
+        Returns: {
+          team: TeamDailyRow[];
+          targets: TargetShortfall[];
+          compliance: MonthlyComplianceRow[];
+        };
+      };
       dashboard_payload: {
         Args: {
           p_from: string;

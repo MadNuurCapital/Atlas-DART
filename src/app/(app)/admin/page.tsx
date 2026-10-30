@@ -8,7 +8,6 @@ import {
   Users,
 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
-import { unwrap } from "@/lib/query";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,11 +16,6 @@ import { TeamBoard } from "@/components/admin/team-board";
 import { GrRing } from "@/components/dashboard/gr-ring";
 import { formatSgDate, sgToday, parseBusinessDate } from "@/lib/sg-date";
 import { formatCurrency, DEADLINE_LABEL } from "@/lib/constants";
-import type {
-  TeamDailyRow,
-  TargetShortfall,
-  MonthlyComplianceRow,
-} from "@/types/database";
 
 export const metadata: Metadata = { title: "Team overview" };
 export const dynamic = "force-dynamic";
@@ -33,24 +27,30 @@ export default async function AdminOverviewPage() {
   const { year, month } = parseBusinessDate(today);
   const supabase = await createClient();
 
-  const [teamRes, targetsRes, complianceRes] = await Promise.all([
-    supabase.rpc("team_daily", { p_date: today }),
-    supabase.from("v_target_shortfall").select("*"),
-    supabase.rpc("monthly_compliance", { p_year: year, p_month: month }),
-  ]);
+  // One round trip, not three. team_daily() and monthly_compliance() are both
+  // SECURITY INVOKER, so wrapping them changes nothing about who may see what.
+  const { data: payload, error } = await supabase.rpc("admin_overview", {
+    p_date: today,
+    p_year: year,
+    p_month: month,
+  });
 
   // A failed read must not become a team that has apparently written nothing.
-  const teamRows = unwrap(teamRes, "the team's day");
-  const targets = unwrap(targetsRes, "team targets");
-  const compliance = unwrap(complianceRes, "monthly compliance");
+  if (error || !payload) {
+    throw new Error(
+      `Could not load the team overview: ${error?.message ?? "no data returned"}`,
+    );
+  }
 
-  const rows = ((teamRows as TeamDailyRow[]) ?? []).map((r) => ({
+  // active_gr arrives from Postgres as a numeric, which PostgREST renders as a
+  // string to preserve precision. The board does arithmetic on it.
+  const rows = payload.team.map((r) => ({
     ...r,
     active_gr: r.active_gr === null ? null : Number(r.active_gr),
   }));
 
-  const targetRows = (targets as TargetShortfall[]) ?? [];
-  const complianceRows = (compliance as MonthlyComplianceRow[]) ?? [];
+  const targetRows = payload.targets;
+  const complianceRows = payload.compliance;
 
   const teamMtdGr = targetRows.reduce(
     (s, t) => s + Number(t.month_to_date_gr),

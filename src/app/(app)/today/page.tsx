@@ -16,7 +16,6 @@ import {
   EDIT_WINDOW_DAYS,
 } from "@/lib/sg-date";
 import { DEADLINE_LABEL } from "@/lib/constants";
-import type { AppointmentActivity, DailySubmission } from "@/types/database";
 
 export const metadata: Metadata = { title: "Today" };
 
@@ -28,7 +27,7 @@ export default async function TodayPage({
 }: {
   searchParams: Promise<{ date?: string }>;
 }) {
-  const profile = await requireProfile();
+  await requireProfile();
   const { date } = await searchParams;
 
   const today = sgToday();
@@ -38,20 +37,24 @@ export default async function TodayPage({
 
   const supabase = await createClient();
 
-  const [{ data: submission }, { data: appointments }] = await Promise.all([
-    supabase
-      .from("daily_submissions")
-      .select("*")
-      .eq("user_id", profile.id)
-      .eq("business_date", businessDate)
-      .maybeSingle(),
-    supabase
-      .from("appointment_activities")
-      .select("*")
-      .eq("user_id", profile.id)
-      .eq("business_date", businessDate)
-      .order("created_at", { ascending: true }),
-  ]);
+  // One round trip, not two. This is the page the whole application exists
+  // for - fifteen people open it every evening - and at ~330ms between US East
+  // and Singapore, the second question was pure waiting.
+  const { data: payload, error } = await supabase.rpc("day_payload", {
+    p_date: businessDate,
+  });
+
+  if (error || !payload) {
+    // An empty form would look exactly like a day with nothing recorded, and
+    // someone would type their numbers in again over the top of numbers that
+    // are already there.
+    throw new Error(
+      `Could not load ${businessDate}: ${error?.message ?? "no data returned"}`,
+    );
+  }
+
+  const submission = payload.submission;
+  const appointments = payload.appointments;
 
   const editable = isWithinEditWindow(businessDate, today);
   const age = daysBetween(businessDate, today);
@@ -110,7 +113,7 @@ export default async function TodayPage({
         <CardContent>
           <DailyForm
             businessDate={businessDate}
-            submission={(submission as DailySubmission | null) ?? null}
+            submission={submission}
             readOnly={!editable}
             readOnlyReason={readOnlyReason}
           />
@@ -128,7 +131,7 @@ export default async function TodayPage({
         <CardContent>
           <AppointmentManager
             businessDate={businessDate}
-            appointments={(appointments as AppointmentActivity[]) ?? []}
+            appointments={appointments}
             readOnly={!editable}
           />
         </CardContent>

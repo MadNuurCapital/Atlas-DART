@@ -23,6 +23,7 @@ import {
   YearTargetTile,
 } from "@/components/dashboard/target-panel";
 import { CaseMixPanel } from "@/components/dashboard/case-mix-panel";
+import { StreakTile } from "@/components/dashboard/streak-tile";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -233,6 +234,14 @@ export default async function DashboardPage() {
       {targetRow_ && (
         <MonthTargetTile target={targetRow_} className="lg:col-span-2" />
       )}
+
+      {/* Beside the target rather than above it. The streak is encouragement;
+          the target is the number that matters. Putting the streak first would
+          say the app cares more about the habit than the business. */}
+      <StreakTile
+        streaks={data.streaks}
+        className="sm:col-span-2 lg:col-span-4"
+      />
 
       <CoachingCard
         sessions={coaching}

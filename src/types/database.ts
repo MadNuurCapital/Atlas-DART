@@ -321,6 +321,12 @@ export type DashboardPayloadRow = {
   pending: PendingInception | null;
   mix: CaseMixByCategory[];
   coaching: unknown[];
+  streaks: {
+    current: number;
+    longest: number;
+    submitted_today: boolean;
+    total_days: number;
+  };
 };
 
 export type Database = {

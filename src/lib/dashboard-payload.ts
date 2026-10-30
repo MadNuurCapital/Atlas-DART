@@ -7,6 +7,17 @@ import type {
 import type { CoachingWithNames } from "@/lib/coaching";
 
 /**
+ * Derived from daily_submissions on every read, never stored - see
+ * 0031_streaks.sql for why a stored counter would drift.
+ */
+export type Streaks = {
+  current: number;
+  longest: number;
+  submitted_today: boolean;
+  total_days: number;
+};
+
+/**
  * What `dashboard_payload()` returns.
  *
  * The function (supabase/migrations/0023_dashboard_payload.sql) answers in one
@@ -29,4 +40,5 @@ export type DashboardPayload = {
   pending: PendingInception | null;
   mix: CaseMixByCategory[];
   coaching: CoachingWithNames[];
+  streaks: Streaks;
 };

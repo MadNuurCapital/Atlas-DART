@@ -5,7 +5,7 @@ import { requireEnv } from "./reminders.mts";
 /**
  * Delivering a web push notification, and keeping the device list honest.
  *
- * Both scheduled push jobs - the hourly chase aimed at consultants and the
+ * Both scheduled push jobs - the evening chase aimed at consultants and the
  * 6 AM list aimed at admins - need the same three things: VAPID configured,
  * the live subscriptions for a set of people, and a send that treats a dead
  * endpoint differently from a flaky one. Doing that in one place is the only

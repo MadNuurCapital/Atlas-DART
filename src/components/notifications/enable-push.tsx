@@ -285,8 +285,8 @@ export function EnablePush({
           <>
             <p className="text-sm text-muted-foreground">
               {enabled
-                ? "You will be reminded every hour from 7pm until you submit. Silent after midnight. It stops the moment you do."
-                : "Get a notification on your phone every hour from 7pm until you have submitted. Silent overnight."}
+                ? "You will be reminded at 7pm, 9pm, 11pm and 11:59pm until you submit, then once silently at 6am. It stops the moment you submit."
+                : "Get a reminder on your phone at 7pm, 9pm, 11pm and 11:59pm until you have submitted, and one silent one at 6am."}
             </p>
 
             <div className="flex flex-wrap gap-2">

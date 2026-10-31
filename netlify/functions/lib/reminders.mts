@@ -85,9 +85,9 @@ export function sgHour(now: Date = new Date()): number {
  * "notifications at different timings" the team reported.
  *
  * So each function now checks that the clock actually agrees it is time. A run
- * that arrives outside its window sends nothing and says so. Missing one
- * hourly nag costs little - there is another next hour, and the person is
- * still chased. Sending one at the wrong time costs trust in the whole thing.
+ * that arrives outside its window sends nothing and says so. Missing one slot
+ * costs little - another is coming, and the 6 AM run is a backstop for all of
+ * them. Sending one at the wrong time costs trust in the whole thing.
  */
 export function withinHourWindow(
   hour: number,

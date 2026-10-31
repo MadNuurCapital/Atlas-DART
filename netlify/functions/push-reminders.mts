@@ -11,16 +11,27 @@ import {
 import { configureVapid, deliver, loadDevices } from "./lib/push.mts";
 
 /**
- * The hourly chase.
+ * The evening chase.
  *
- * Runs every hour from 11:00 to 22:00 UTC, which is 19:00 through 06:00 in
- * Singapore - a contiguous UTC range even though it crosses Singapore midnight.
+ * Five runs a night, not twelve:
  *
- *   7pm - 11pm SGT   with sound. The deadline has not passed, so these are the
- *                    ones that actually prevent a missed day.
- *   midnight - 6am   SILENT, and about YESTERDAY. The day is already late
- *                    whatever anyone does, so the notification waits on the
- *                    lock screen rather than waking the whole team at 3am.
+ *   7:00 PM SGT    firm      "closes at 11:59 PM, takes two minutes"
+ *   9:00 PM SGT    urgent    "submit before you forget"
+ *   11:00 PM SGT   final     "last call"
+ *   11:59 PM SGT   deadline  "closing now"          <- ?slot=deadline
+ *   6:00 AM SGT    overdue   SILENT, and about YESTERDAY
+ *
+ * It used to run every hour from 7 PM to 6 AM, which meant someone who forgot
+ * got twelve notifications in a night - seven of them between midnight and
+ * dawn. Twelve notifications is not twelve times the reminder; past about the
+ * third it is noise, and noise is what people turn off. Four audible
+ * notifications spaced two hours apart say the same thing and leave the
+ * permission intact.
+ *
+ * The 6 AM run is silent and talks about yesterday: the day is already late
+ * whatever anyone does, so it waits on the lock screen rather than waking the
+ * team, and it lands just before the admin digest goes out - the last chance
+ * to fix it before someone else sees the list.
  *
  * Submitting removes someone from the list, and the chase stops. That is the
  * only way to stop it, which is the point.
@@ -38,7 +49,16 @@ const NAG_END_HOUR = 7;
 const WINDOW_FROM = 19;
 const WINDOW_TO = 6;
 
-type Level = "firm" | "urgent" | "final" | "overdue";
+/**
+ * The 11:59 PM final call, which needs a name of its own.
+ *
+ * Everything else in this function is identified by its Singapore hour, and
+ * 11:59 PM is hour 23 - the same hour as the 11 PM chase. See the handler.
+ */
+export const DEADLINE_SLOT = "deadline";
+export const DEADLINE_HOUR = 23;
+
+export type Level = "firm" | "urgent" | "final" | "deadline" | "overdue";
 
 function levelForHour(hour: number): Level {
   if (hour < NAG_END_HOUR) return "overdue";
@@ -47,7 +67,24 @@ function levelForHour(hour: number): Level {
   return "final";
 }
 
-function copyFor(level: Level, firstName: string) {
+/** What this run is, given the hour it woke in and the slot it was called as. */
+export function levelFor(hour: number, slot: string | null): Level {
+  return slot === DEADLINE_SLOT ? "deadline" : levelForHour(hour);
+}
+
+/**
+ * The reminder_logs key, which is also the idempotency key.
+ *
+ * Two runs that produce the same key are the same reminder as far as the log
+ * is concerned, and the second one sends nothing. That is the whole point when
+ * it is a retry - and a bug when it is the 11:59 PM final call sharing hour 23
+ * with the 11 PM one, which is why the slot takes precedence over the hour.
+ */
+export function reminderTypeFor(hour: number, slot: string | null): string {
+  return slot ? `push_${slot}` : `push_${hour}`;
+}
+
+export function copyFor(level: Level, firstName: string) {
   switch (level) {
     case "overdue":
       return {
@@ -55,6 +92,13 @@ function copyFor(level: Level, firstName: string) {
         body: "It is already late. Submit it before your admin gets the 6 AM list.",
         requireInteraction: true,
         silent: true,
+      };
+    case "deadline":
+      return {
+        title: `Closing now, ${firstName}`,
+        body: "This is the last minute to submit today's DART.",
+        requireInteraction: true,
+        silent: false,
       };
     case "final":
       return {
@@ -65,7 +109,12 @@ function copyFor(level: Level, firstName: string) {
       };
     case "urgent":
       return {
-        title: `Your DART is not updated, ${firstName}`,
+        // Deliberately not the same title as "firm". These notifications share
+        // a tag, so each one REPLACES the last in the tray rather than
+        // stacking: with identical titles the 9 PM reminder is indistinguishable
+        // from the 7 PM one still sitting there unread, and a notification that
+        // looks like one you have already seen is one you do not read.
+        title: `Still not updated, ${firstName}`,
         body: "Closes at 11:59 PM tonight. Submit before you forget.",
         requireInteraction: true,
         silent: false,
@@ -95,7 +144,21 @@ export default async function handler(request: Request) {
   }
 
   const hour = Number(url.searchParams.get("hour") ?? sgHour());
-  const level = levelForHour(hour);
+
+  // The 11:59 PM run shares its hour with the 11 PM one, so the hour alone
+  // cannot tell them apart - and the log key is built from it. Without a
+  // separate name both runs key on `push_23`, the second finds the first in
+  // reminder_logs, and the final call is skipped as a duplicate of the thing
+  // it is supposed to follow. The schedule passes ?slot=deadline for it.
+  const slot = url.searchParams.get("slot");
+  if (slot !== null && slot !== DEADLINE_SLOT) {
+    return Response.json(
+      { error: `unknown slot "${slot}"`, known: [DEADLINE_SLOT] },
+      { status: 400 },
+    );
+  }
+
+  const level = levelFor(hour, slot);
 
   // Overnight the day being chased is yesterday. Today has barely started.
   const businessDate =
@@ -103,15 +166,38 @@ export default async function handler(request: Request) {
     (hour < NAG_END_HOUR ? previousDay(sgToday()) : sgToday());
 
   const dryRun = url.searchParams.get("dryRun") === "true";
-  const reminderType = `push_${hour}`;
+  const reminderType = reminderTypeFor(hour, slot);
 
   console.log(
-    "[push-reminders] start date=%s hour=%d level=%s dryRun=%s",
+    "[push-reminders] start date=%s hour=%d slot=%s level=%s dryRun=%s",
     businessDate,
     hour,
+    slot ?? "-",
     level,
     dryRun,
   );
+
+  // The final call is the one slot that cannot run late.
+  //
+  // It says "closing now", and at 00:20 nothing is closing - the day shut
+  // twenty minutes ago. pg_cron delivers this one on the minute; GitHub's
+  // copy of the same schedule routinely arrives 15-40 minutes behind, which
+  // here means after midnight. So a late one sends nothing and the 6 AM
+  // overdue run picks the person up instead.
+  if (slot === DEADLINE_SLOT && hour !== DEADLINE_HOUR) {
+    console.log(
+      "[push-reminders] deadline slot arrived at hour=%d - too late, sending nothing",
+      hour,
+    );
+    return Response.json({
+      businessDate,
+      hour,
+      slot,
+      skipped: "the final call arrived after the deadline",
+      missing: 0,
+      sent: 0,
+    });
+  }
 
   // Refuse to chase outside the hours the team agreed to.
   //
@@ -217,6 +303,7 @@ export default async function handler(request: Request) {
     const summary = {
       businessDate,
       hour,
+      slot,
       level,
       silent: level === "overdue",
       dryRun,
@@ -248,7 +335,11 @@ export default async function handler(request: Request) {
  * ever running this.
  *
  * The schedule lives in .github/workflows/reminders.yml, which calls this
- * over HTTP with the shared token:
+ * over HTTP with the shared token, and is mirrored in pg_cron:
  *
- *   0 11-22 * * * UTC = hourly 19:00-06:00 Asia/Singapore
+ *   0 11  * * *  UTC = 19:00 SGT
+ *   0 13  * * *  UTC = 21:00 SGT
+ *   0 15  * * *  UTC = 23:00 SGT
+ *   59 15 * * *  UTC = 23:59 SGT  (&slot=deadline)
+ *   0 22  * * *  UTC = 06:00 SGT  (silent, yesterday)
  */

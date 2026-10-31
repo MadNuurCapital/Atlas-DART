@@ -198,6 +198,58 @@ describe("hourly push nag logging", () => {
     });
   });
 
+  /**
+   * The 11:59 PM final call.
+   *
+   * It shares hour 23 with the 11 PM slot, so it writes a named key rather
+   * than an hour. The check constraint allowed only `push_<hour>` until 0033,
+   * which would have refused this row - and the function sends the
+   * notification BEFORE writing the row and never looks at the result, so the
+   * refusal would have been invisible: the push went out, nothing was logged,
+   * and the next run would have sent it a second time.
+   */
+  it("accepts the named deadline slot", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      const today = await sgToday(c);
+      await asOwner(c);
+
+      await c.query(
+        `insert into public.reminder_logs (user_id, business_date, reminder_type, status)
+         values ($1, $2, 'push_deadline', 'sent')`,
+        [a.id, today],
+      );
+
+      const { rows } = await c.query(
+        "select reminder_type from public.reminder_logs",
+      );
+      expect(rows).toEqual([{ reminder_type: "push_deadline" }]);
+    });
+  });
+
+  it("keeps the deadline slot apart from the 11 PM one", async () => {
+    await withRollback(async (c) => {
+      const a = await seedUser(c);
+      const today = await sgToday(c);
+      await asOwner(c);
+
+      // Both must fit, on the same day, for the same person. If they ever
+      // collapse into one key the final call is lost.
+      for (const type of ["push_23", "push_deadline"]) {
+        await c.query(
+          `insert into public.reminder_logs (user_id, business_date, reminder_type, status)
+           values ($1, $2, $3, 'sent')`,
+          [a.id, today, type],
+        );
+      }
+
+      const { rows } = await c.query(
+        "select count(*)::int as n from public.reminder_logs",
+      );
+      expect(rows[0].n).toBe(2);
+    });
+  });
+
   it("still rejects a nonsense reminder type", async () => {
     await withRollback(async (c) => {
       const a = await seedUser(c);

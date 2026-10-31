@@ -140,16 +140,47 @@ revoke all on function public.call_reminder(text, text) from public, anon, authe
 -- ---------------------------------------------------------------------------
 -- pg_cron runs in UTC, like GitHub. Singapore is UTC+8 year-round.
 --
---   0 11-22 * * *   hourly 19:00-06:00   the DART chase
---   0 0,11  * * *   08:00 and 19:00      coaching
---   0 13    * * *   21:00                the email nudge
---   0 22    * * *   06:00                the admin digest
+--   0 11  * * *   19:00 SGT   chase, firm
+--   0 13  * * *   21:00 SGT   chase, urgent  + the email nudge
+--   0 15  * * *   23:00 SGT   chase, last call
+--   59 15 * * *   23:59 SGT   chase, final call   (?slot=deadline)
+--   0 22  * * *   06:00 SGT   chase, silent + the admin digest
+--   0 0,11 * * *  08:00 and 19:00 SGT   coaching
+--
+-- The chase is five slots, not an hourly range. It WAS hourly, which meant
+-- twelve notifications a night for anyone who forgot - see
+-- retune-reminder-schedule.sql for why that stopped.
+--
+-- The 11:59 slot passes slot=deadline, and must. It shares hour 23 with the
+-- 11 PM slot, and the key the function writes to reminder_logs is built from
+-- the hour: without a name of its own the final call keys on push_23, finds
+-- the 11 PM row, and skips itself as a duplicate of the thing it follows.
 --
 -- cron.schedule replaces a job of the same name, so re-running this section
 -- updates the schedule instead of creating a second copy.
 
 select cron.schedule(
-  'atlas-dart-push-reminders', '0 11-22 * * *',
+  'atlas-dart-push-1900', '0 11 * * *',
+  $$select public.call_reminder('push-reminders')$$
+);
+
+select cron.schedule(
+  'atlas-dart-push-2100', '0 13 * * *',
+  $$select public.call_reminder('push-reminders')$$
+);
+
+select cron.schedule(
+  'atlas-dart-push-2300', '0 15 * * *',
+  $$select public.call_reminder('push-reminders')$$
+);
+
+select cron.schedule(
+  'atlas-dart-push-2359', '59 15 * * *',
+  $$select public.call_reminder('push-reminders', 'slot=deadline')$$
+);
+
+select cron.schedule(
+  'atlas-dart-push-0600', '0 22 * * *',
   $$select public.call_reminder('push-reminders')$$
 );
 
@@ -168,12 +199,25 @@ select cron.schedule(
   $$select public.call_reminder('reminder-admin-digest')$$
 );
 
+-- The hourly chase this schedule replaced. A database set up before the five
+-- slots existed still has it, and cron.schedule above cannot replace it -
+-- the new jobs have new names, so it would simply keep running alongside
+-- them and the night would be louder than before.
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'atlas-dart-push-reminders') then
+    perform cron.unschedule('atlas-dart-push-reminders');
+    raise notice 'Retired the old hourly job atlas-dart-push-reminders.';
+  end if;
+end;
+$$;
+
 
 -- ---------------------------------------------------------------------------
 -- 5. Prove the token actually works, before trusting it at 7 PM
 -- ---------------------------------------------------------------------------
--- Four active jobs is NOT proof the reminders will fire. The jobs can be
--- perfectly scheduled and every call still rejected, which is exactly what
+-- A full set of active jobs is NOT proof the reminders will fire. The jobs can
+-- be perfectly scheduled and every call still rejected, which is exactly what
 -- happened the first time this script was run: the placeholder went into Vault
 -- and every call came back 401, with nothing to show for it until someone
 -- looked.
@@ -210,10 +254,10 @@ select
   j.active_jobs,
   r.status_code,
   case
-    when j.active_jobs < 4
-      then 'STOP - expected 4 active jobs. Section 4 did not run.'
+    when j.active_jobs < 8
+      then 'STOP - expected 8 active jobs. Section 4 did not run fully.'
     when r.status_code = 200 and r.content like '%"dryRun":true%'
-      then 'OK - 4 jobs scheduled, token accepted, nothing sent. The reminders will fire.'
+      then 'OK - 8 jobs scheduled, token accepted, nothing sent. The reminders will fire.'
     when r.status_code = 200
       then 'Token accepted, but this reply is not from a dry run - read the content column before trusting it.'
     when r.status_code = 401
@@ -252,8 +296,6 @@ left join reply r on true;
 --
 -- TO STOP IT AGAIN
 --
---   select cron.unschedule('atlas-dart-push-reminders');
---   select cron.unschedule('atlas-dart-coaching-reminders');
---   select cron.unschedule('atlas-dart-reminder-consultants');
---   select cron.unschedule('atlas-dart-reminder-admin-digest');
+--   select cron.unschedule(jobname) from cron.job
+--    where jobname like 'atlas-dart-%';
 -- ===========================================================================

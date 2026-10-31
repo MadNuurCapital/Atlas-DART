@@ -10,12 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const metadata: Metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
 
+/**
+ * Four reminders, then one silent one. This list must match the slots in
+ * netlify/functions/push-reminders.mts - it is the only place anyone is told
+ * what to expect, and a promise of "every hour" that no longer happens is
+ * worse than no list at all.
+ */
 const SCHEDULE = [
   ["7:00 PM", "First reminder"],
-  ["8:00 – 10:00 PM", "Every hour"],
+  ["9:00 PM", "Second reminder"],
   ["11:00 PM", "Last call"],
-  ["11:59 PM", "Deadline — after this the day counts as late"],
-  ["Midnight – 6:00 AM", "Every hour, but silent — it waits on your lock screen"],
+  ["11:59 PM", "Final call — after this the day counts as late"],
+  ["6:00 AM", "One silent reminder about yesterday, on your lock screen"],
   ["6:00 AM", "Your admin gets the list of who missed"],
 ] as const;
 
@@ -137,7 +143,9 @@ export default async function NotificationsPage({
           <ul className="space-y-2">
             {SCHEDULE.map(([time, what]) => (
               <li
-                key={time}
+                // Two rows read "6:00 AM" - the silent personal one and the
+                // admin list - so the time alone is not a unique key.
+                key={`${time} ${what}`}
                 className="flex items-baseline justify-between gap-3 text-sm"
               >
                 <span className="font-medium tabular-nums">{time}</span>
@@ -147,8 +155,8 @@ export default async function NotificationsPage({
           </ul>
           <p className="mt-4 rounded-md border border-border bg-muted px-3 py-2.5 text-xs text-muted-foreground">
             All of it stops the moment you submit. Nothing fires before 7 PM,
-            and nothing makes a sound after midnight. Submitting is the only
-            way to make it leave you alone — which is rather the point.
+            nothing fires overnight, and the 6 AM one is silent. Submitting is
+            the only way to make it leave you alone — which is rather the point.
           </p>
 
           {profile.role === "admin" && (

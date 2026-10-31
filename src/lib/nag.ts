@@ -8,11 +8,15 @@ import { SG_TIME_ZONE, sgToday, addDays, type BusinessDate } from "@/lib/sg-date
  *
  *   before 7pm   nothing. Chasing people mid-afternoon is how they learn to
  *                ignore it, and the dashboard already says the day is open.
- *   7pm - 11pm   hourly, with sound. These are the ones that actually prevent
- *                a missed day, because the deadline has not passed yet.
- *   midnight-6am hourly but SILENT. The day is already late whatever they do,
- *                so it waits on the lock screen rather than waking anyone.
+ *   7pm - 11pm   firm, then urgent, then final. The deadline has not passed
+ *                yet, so these are the ones that prevent a missed day.
+ *   after midnight  overdue. The day is already late whatever they do.
  *   6am          admins get the list of who missed.
+ *
+ * This is the level the PAGE reads, so it is a function of the hour alone -
+ * whenever someone opens the app, the banner tells them where they stand. The
+ * push notifications follow the same levels but at five fixed times
+ * (7, 9, 11, 11:59 PM, and a silent 6 AM); see push-reminders.mts.
  */
 
 export type NagLevel = "none" | "firm" | "urgent" | "final" | "overdue";

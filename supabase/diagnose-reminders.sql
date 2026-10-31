@@ -162,8 +162,8 @@ report as (
   -- 6. Stated plainly, because it is the commonest misunderstanding.
   union all
   select 8, '6. NOTE', 'the schedule is fixed',
-         '7 PM, then hourly to 11 PM, then hourly and SILENT to 6 AM',
-         'There is no per-person reminder time. The Reminders screen DISPLAYS these hours, it does not set them. Overnight reminders are deliberately silent - they wait on the lock screen rather than waking the team at 3 AM.'
+         '7 PM, 9 PM, 11 PM, 11:59 PM, then one SILENT at 6 AM',
+         'There is no per-person reminder time. The Reminders screen DISPLAYS these hours, it does not set them. The 6 AM one is deliberately silent and is about YESTERDAY - it waits on the lock screen rather than waking anyone, and lands just before the admin digest.'
 )
 
 select step, subject, detail, verdict

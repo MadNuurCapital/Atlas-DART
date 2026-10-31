@@ -6,13 +6,13 @@ these" below for why that distinction is the whole ballgame.
 
 | Function | Cron (UTC) | Singapore | What it does |
 |---|---|---|---|
-| `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | Chases anyone still missing |
+| `push-reminders` | `0 11 * * *`, `0 13 * * *`, `0 15 * * *`, `59 15 * * *`, `0 22 * * *` | 19:00, 21:00, 23:00, 23:59, 06:00 | Chases anyone still missing |
 | `coaching-reminders` | `0 0,11 * * *` | 08:00 and 19:00 | Reminds both sides of a booked coaching session |
 | `reminder-consultants` | `0 13 * * *` | 21:00 | One email — **skips itself entirely** until a Resend sender exists |
 | `reminder-admin-digest` | `0 22 * * *` | 06:00 | Notifies admins of yesterday's missing list, and emails it too if Resend is set up |
 
 **Nothing here needs a domain.** Push notifications need only the VAPID keys,
-so both the hourly chase and the 6am admin list work as-is. Email is the
+so both the evening chase and the 6am admin list work as-is. Email is the
 optional extra on top.
 
 `reminder-consultants` returns early when `RESEND_API_KEY` or
@@ -88,44 +88,63 @@ and sent the *evening-before* reminder for the *next* day instead of the
 
 Outside those hours the function returns a `skipped` summary and writes no log
 row, so the slot is still free to run properly if it arrives. Missing one
-hourly nag costs little — there is another next hour. Sending one at the wrong
-time costs trust in the whole system.
+slot costs little — there is another one coming, and the 6am run is a backstop
+for all of them. Sending one at the wrong time costs trust in the whole system.
 
 `?hour=` overrides the clock for testing, and the window applies to whatever
 hour is passed, so a simulated `19` behaves exactly as 7 PM does.
 
 **A second scheduler covers the missed slots.** `supabase/enable-pg-cron-reminders.sql`
-adds pg_cron jobs inside Supabase on the same four crons. Both schedulers call
+adds pg_cron jobs inside Supabase on the same crons. Both schedulers call
 the same functions; whichever arrives first does the work, and the other finds
 the `reminder_logs` row already written and sends nothing. Two schedulers
 against one idempotent target beats one unreliable scheduler. The token lives
 in Supabase Vault rather than in the job definition, where it would sit in
 plain text in `cron.job`.
 
-## The hourly chase
+## The evening chase
 
-`push-reminders` runs every hour from 11:00 to 22:00 UTC — 19:00 through 06:00
-in Singapore. That is a contiguous UTC range even though it crosses Singapore
-midnight, so it is one cron rather than two.
+Five slots a night:
 
-| Singapore | Level | Sound | About |
-|---|---|---|---|
-| 7–8pm | firm | yes | today |
-| 9–10pm | urgent | yes | today |
-| 11pm | final | yes | today |
-| midnight–6am | overdue | **silent** | **yesterday** |
+| Singapore | Level | `reminder_type` | Sound | About |
+|---|---|---|---|---|
+| 7:00pm | firm | `push_19` | yes | today |
+| 9:00pm | urgent | `push_21` | yes | today |
+| 11:00pm | final | `push_23` | yes | today |
+| 11:59pm | deadline | `push_deadline` | yes | today |
+| 6:00am | overdue | `push_6` | **silent** | **yesterday** |
 
-Two things worth understanding:
+It used to run every hour from 7pm to 6am — twelve notifications a night for
+anyone who forgot, seven of them between midnight and dawn. Past about the
+third, a reminder is not a reminder; it is the reason someone turns
+notifications off, and a muted phone cannot be chased at all. Four audible
+notifications two hours apart say the same thing and leave the permission
+intact.
+
+**The 11:59pm slot needs `?slot=deadline`, and this is not optional.** It
+shares hour 23 with the 11pm slot, and `reminder_type` is derived from the
+hour. Without a name of its own the final call keys on `push_23`, finds the
+11pm row already written, and skips itself as a duplicate of the thing it is
+meant to follow — sending nothing, logging nothing, and reporting success.
+`reminderTypeFor()` is where the slot takes precedence over the hour, and
+`tests/unit/chase-slots.test.ts` asserts the five keys stay distinct.
+
+**It is also the one slot that cannot run late.** It says "closing now", and at
+00:20 nothing is closing, so the function refuses to send it outside hour 23.
+pg_cron fires on the minute, which is what makes it work. GitHub Actions is
+routinely 15–40 minutes behind and its copy will usually arrive after midnight
+and be dropped — intended, not a fault: anyone missed is picked up at 6am.
+
+Two more things worth understanding:
 
 **Overnight it chases yesterday.** At 2am nobody owes anything for the day that
 just started. `nagBusinessDate()` and the function agree on this, so the
 notification, the banner and the Submit link all point at the same day.
 
-**Overnight it is silent.** The day is already late whatever anyone does, so the
-notification waits on the lock screen rather than waking the team at 3am. That
-is what makes an all-night chase acceptable rather than the thing that makes
-everyone disable notifications — which would cost the 7–11pm pings that actually
-prevent a missed day.
+**The 6am one is silent.** The day is already late whatever anyone does, so the
+notification waits on the lock screen rather than waking anyone. It lands just
+before the admin digest goes out on the same minute, which makes it the last
+chance to fix yesterday before someone else sees the list.
 
 Notifications share a tag, so a later one replaces the earlier rather than
 stacking twelve by morning.

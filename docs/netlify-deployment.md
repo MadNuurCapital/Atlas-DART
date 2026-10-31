@@ -62,7 +62,7 @@ They must **not** declare `export const config = { schedule }`. Doing so makes t
 
 | Function | Cron (UTC) | Singapore | Needs |
 |---|---|---|---|
-| `push-reminders` | `0 11-22 * * *` | hourly 19:00–06:00 | VAPID keys |
+| `push-reminders` | `0 11 * * *`, `0 13 * * *`, `0 15 * * *`, `59 15 * * *`, `0 22 * * *` | 19:00, 21:00, 23:00, 23:59, 06:00 | VAPID keys |
 | `reminder-consultants` | `0 13 * * *` | 21:00 | Resend — skips itself without it |
 | `reminder-admin-digest` | `0 22 * * *` | 06:00 | VAPID keys; Resend optional |
 | `coaching-reminders` | `0 0,11 * * *` | 08:00 and 19:00 | VAPID keys |

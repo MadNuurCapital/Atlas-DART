@@ -112,6 +112,15 @@ export type TargetRow = {
 export type ComplianceRow = {
   consultant: string;
   requiredDays: number;
+  /**
+   * Declared leave inside the elapsed part of the month.
+   *
+   * requiredDays already has these removed, which is why this column exists:
+   * without it, "18 required" in a 22-day month is a number with no
+   * explanation, and a compliance report that cannot be reconciled against a
+   * calendar is one nobody trusts.
+   */
+  awayDays: number;
   submittedDays: number;
   onTimeDays: number;
   lateDays: number;
@@ -351,6 +360,9 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
     { header: "On-Time Days", key: "onTime", width: 14 },
     { header: "Late Days", key: "late", width: 11 },
     { header: "Missing Days", key: "missing", width: 13 },
+    // Appended rather than inserted beside Required Days: anything reading
+    // this sheet by column position keeps working.
+    { header: "Away Days", key: "away", width: 11 },
     { header: "Compliance %", key: "pct", width: 14, style: { numFmt: EXCEL_PERCENT_FORMAT } },
   ]);
 
@@ -362,6 +374,7 @@ export async function buildWorkbook(data: ExportData): Promise<ExcelJS.Workbook>
       onTime: row.onTimeDays,
       late: row.lateDays,
       missing: row.missingDays,
+      away: row.awayDays,
       pct: row.compliance,
     });
   }

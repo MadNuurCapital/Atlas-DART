@@ -132,6 +132,7 @@ function fixture(overrides: Partial<ExportData> = {}): ExportData {
         onTimeDays: 28,
         lateDays: 2,
         missingDays: 1,
+        awayDays: 0,
         compliance: 30 / 31,
       },
     ],

@@ -16,6 +16,7 @@ import type {
   CaseStatus,
   CoachingCategory,
   CoachingStatus,
+  LeaveReason,
   PolicyType,
   ReminderType,
   Role,
@@ -278,7 +279,16 @@ export type TeamDailyRow = {
   role: Role;
   business_date: string;
   submission_id: string | null;
-  status: SubmissionStatus | "missing";
+  /**
+   * Precedence: submitted > away > draft > missing.
+   *
+   * "away" is listed here rather than only in the `away` boolean so that
+   * TypeScript forces every consumer of this field to decide what to do with
+   * it. Attendance showing red for somebody on declared leave is the exact
+   * bug this feature exists to fix, and a widened union finds those places at
+   * compile time instead of leaving them to be noticed in production.
+   */
+  status: SubmissionStatus | "missing" | "away";
   dials: number | null;
   talked_to: number | null;
   campaign_status: CampaignStatus | null;
@@ -293,6 +303,24 @@ export type TeamDailyRow = {
   last_submitted_at: string | null;
   revision_count: number | null;
   on_time: boolean | null;
+  /**
+   * True whenever the person had declared leave covering this date - including
+   * when they submitted anyway, which is why this is separate from `status`.
+   * A DART filed from a hotel should read as present AND as away; neither fact
+   * should hide the other.
+   */
+  away: boolean;
+  /** Last day of the covering leave period, for "back on the 12th". */
+  away_until: string | null;
+  leave_reason: LeaveReason | null;
+};
+
+/** One line of the admin "who is away" roster. */
+export type AwayRoster = {
+  user_id: string;
+  full_name: string;
+  starts_on: string;
+  ends_on: string;
 };
 
 export type MonthlyComplianceRow = {
@@ -303,7 +331,33 @@ export type MonthlyComplianceRow = {
   on_time_days: number;
   late_days: number;
   missing_days: number;
+  /**
+   * Days inside the elapsed part of the month that the person was away.
+   * required_days already has these removed; this is returned so a scorecard
+   * can say "18 of 18, 4 days away" instead of silently showing a smaller
+   * denominator that looks like a bug.
+   */
+  away_days: number;
   compliance: number;
+};
+
+/**
+ * A declared period of leave. Both dates inclusive, Singapore calendar.
+ *
+ * `cancelled_at` rather than a delete: the audit row that records a
+ * cancellation has to have something left to point at, and "there is no
+ * record of it" says something quite different from "it was cancelled".
+ */
+export type LeavePeriod = {
+  id: string;
+  user_id: string;
+  starts_on: string;
+  ends_on: string;
+  reason: LeaveReason;
+  note: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type InsertOf<T, Generated extends keyof T> = Omit<T, Generated> &
@@ -417,6 +471,15 @@ export type Database = {
         Update: Partial<CoachingSession>;
         Relationships: [];
       };
+      leave_periods: {
+        Row: LeavePeriod;
+        Insert: InsertOf<
+          LeavePeriod,
+          "id" | "created_at" | "updated_at" | "cancelled_at" | "note"
+        >;
+        Update: Partial<LeavePeriod>;
+        Relationships: [];
+      };
       coaching_notes: {
         Row: CoachingNotes;
         Insert: InsertOf<
@@ -481,6 +544,14 @@ export type Database = {
         Returns: MissingSubmission[];
       };
       team_daily: { Args: { p_date?: string }; Returns: TeamDailyRow[] };
+      is_away: {
+        Args: { p_user: string; p_date: string };
+        Returns: boolean;
+      };
+      away_days: {
+        Args: { p_user: string; p_from: string; p_to: string };
+        Returns: number;
+      };
       monthly_compliance: {
         Args: { p_year: number; p_month: number };
         Returns: MonthlyComplianceRow[];
@@ -503,6 +574,22 @@ export type Database = {
         Returns: {
           profile: Profile | null;
           nag_status: SubmissionStatus | null;
+          /**
+           * Leave covering TODAY, for the "Away Mode is on" indicator. Three
+           * fields rather than the row: shipping the whole record would put
+           * somebody's medical note into every page load.
+           */
+          away: {
+            starts_on: string;
+            ends_on: string;
+            reason: LeaveReason;
+          } | null;
+          /**
+           * Whether the day being CHASED was an away day - a different
+           * question from `away`, because between midnight and 6 AM the app
+           * chases yesterday. This is the one that silences the nag.
+           */
+          nag_away: boolean;
         };
       };
       /** /today in one round trip: the submission and its appointment rows. */
@@ -520,6 +607,13 @@ export type Database = {
           team: TeamDailyRow[];
           targets: TargetShortfall[];
           compliance: MonthlyComplianceRow[];
+          /**
+           * Who is away on the date. Name, dates, and nothing else - a
+           * manager needs to know who is out and until when, and
+           * self-declared medical leave is not something to publish on a
+           * dashboard to answer that.
+           */
+          away_now: AwayRoster[];
         };
       };
       /** The notification centre: both streams merged, plus the unread count. */

@@ -10,6 +10,7 @@ import {
   GraduationCap,
   History,
   LayoutDashboard,
+  Plane,
   ScrollText,
   Shield,
   Table2,
@@ -26,6 +27,10 @@ const CONSULTANT_ITEMS = [
   { href: "/appointments", label: "Appointments", icon: Users },
   { href: "/cases", label: "Cases", icon: Briefcase },
   { href: "/history", label: "History", icon: History },
+  // Not in the bottom navigation: that already carries five items, which is
+  // as many as fit on a phone. The dashboard card is the way in on mobile,
+  // the same route /coaching takes.
+  { href: "/leave", label: "Leave", icon: Plane },
 ] as const;
 
 const ADMIN_ITEMS = [

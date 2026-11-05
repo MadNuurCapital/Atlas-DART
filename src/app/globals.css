@@ -82,6 +82,11 @@
   --status-absent: #d92d20;
   --status-late: #c77700;
   --status-missing: #8a9aa6;
+  /* Away. Blue so it cannot be mistaken for absent at a glance - the whole
+     point of the status is that it is not a problem. Picked for contrast
+     against both the present green and the absent red, including for the
+     commonest colour-blindness, where green and red are the pair that go. */
+  --status-away: #1668c4;
 }
 
 /*
@@ -135,6 +140,7 @@
     --status-absent: #f2645a;
     --status-late: #f0b043;
     --status-missing: #6c7c88;
+    --status-away: #5aa9f2;
   }
 }
 
@@ -172,6 +178,7 @@
   --color-status-absent: var(--status-absent);
   --color-status-late: var(--status-late);
   --color-status-missing: var(--status-missing);
+  --color-status-away: var(--status-away);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TeamBoard } from "@/components/admin/team-board";
+import { AwayRoster } from "@/components/admin/away-roster";
 import { GrRing } from "@/components/dashboard/gr-ring";
 import { formatSgDate, sgToday, parseBusinessDate } from "@/lib/sg-date";
 import { formatCurrency, DEADLINE_LABEL } from "@/lib/constants";
@@ -187,6 +188,11 @@ export default async function AdminOverviewPage() {
         </Card>
       )}
 
+      {/* Above the board, and only when somebody is away. An admin reading
+          "4 missing" wants the away list in the same glance, not after a
+          scroll - that is what stops them chasing somebody on a plane. */}
+      <AwayRoster rows={payload.away_now} />
+
       <TeamBoard initialRows={rows} businessDate={today} />
 
       <Card>
@@ -218,6 +224,12 @@ export default async function AdminOverviewPage() {
                   <span className="min-w-0 truncate">{c.full_name}</span>
                   <span className="flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
                     {c.submitted_days}/{c.required_days} days
+                    {/* Why the denominator is smaller than the calendar.
+                        Without this, "18/18" for somebody who was away for
+                        four days looks like the figure is wrong. */}
+                    {Number(c.away_days) > 0 && (
+                      <Badge variant="away">{c.away_days} away</Badge>
+                    )}
                     {Number(c.late_days) > 0 && (
                       <Badge variant="warning">{c.late_days} late</Badge>
                     )}

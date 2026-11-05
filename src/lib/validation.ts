@@ -3,9 +3,16 @@ import {
   APPOINTMENT_TYPES,
   CAMPAIGN_STATUSES,
   COACHING_CATEGORIES,
+  LEAVE_REASONS,
+  MAX_LEAVE_DAYS,
   POLICY_TYPES,
 } from "@/lib/constants";
-import { EDIT_WINDOW_DAYS, isWithinEditWindow, sgToday } from "@/lib/sg-date";
+import {
+  EDIT_WINDOW_DAYS,
+  daysBetween,
+  isWithinEditWindow,
+  sgToday,
+} from "@/lib/sg-date";
 
 /**
  * Shared validation.
@@ -253,3 +260,47 @@ export const coachingCancelSchema = z.object({
     .min(3, "Give a reason")
     .max(1000, "That reason is too long"),
 });
+
+/**
+ * A period of leave.
+ *
+ * Validated here as well as by the CHECK constraints in 0034, deliberately:
+ * the database refusal is the guarantee, this is the one that produces a
+ * sentence next to the right field instead of a Postgres error code.
+ *
+ * Backdating is allowed on purpose - somebody hospitalised last week has to be
+ * able to put their record right - so there is no lower bound on the start
+ * date. The audit trail is what makes that accountable rather than silent.
+ */
+export const leavePeriodSchema = z
+  .object({
+    startsOn: businessDateSchema,
+    endsOn: businessDateSchema,
+    reason: z.enum(LEAVE_REASONS, { message: "Choose a reason" }),
+    note: z
+      .string()
+      .max(500, "Keep this under 500 characters")
+      .optional()
+      .or(z.literal("")),
+  })
+  .refine((v) => v.endsOn >= v.startsOn, {
+    // ISO dates compare correctly as strings, which is most of why this app
+    // stores business dates as YYYY-MM-DD text rather than as instants.
+    path: ["endsOn"],
+    message: "The last day cannot be before the first day",
+  })
+  .refine((v) => daysBetween(v.startsOn, v.endsOn) + 1 <= MAX_LEAVE_DAYS, {
+    path: ["endsOn"],
+    message: `Leave cannot be longer than ${MAX_LEAVE_DAYS} days. Check the year on both dates.`,
+  })
+  .refine(
+    (v) => v.reason !== "other" || (v.note ?? "").trim().length > 0,
+    {
+      // "Other" with nothing beside it tells an admin looking at the team
+      // board precisely nothing, which is the one thing the field is for.
+      path: ["note"],
+      message: "Tell us briefly what this is for",
+    },
+  );
+
+export type LeavePeriodInput = z.infer<typeof leavePeriodSchema>;

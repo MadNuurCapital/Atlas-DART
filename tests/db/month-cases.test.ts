@@ -353,6 +353,8 @@ describe("the dashboard payload carries both, in one round trip", () => {
         "cases_month",
         "coaching",
         "days",
+        // Leave & Away Mode rides this call rather than adding one of its own.
+        "leave",
         "missed",
         "mix",
         "pending",

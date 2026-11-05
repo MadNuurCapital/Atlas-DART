@@ -68,6 +68,9 @@ const row: TeamDailyRow = {
   last_submitted_at: "2026-03-10T12:00:00Z",
   revision_count: 0,
   on_time: true,
+  away: false,
+  away_until: null,
+  leave_reason: null,
 };
 
 async function mount() {

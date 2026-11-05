@@ -62,6 +62,35 @@ export type PolicyType = (typeof POLICY_TYPES)[number];
 export const CASE_STATUSES = ["active", "cancelled"] as const;
 export type CaseStatus = (typeof CASE_STATUSES)[number];
 
+/**
+ * Leave & Away Mode.
+ *
+ * The stored values are short and neutral; the labels are what anyone reads.
+ * "personal" rather than "family" because the reason covers both and nobody
+ * should have to pick a category that overstates their situation.
+ */
+export const LEAVE_REASONS = [
+  "holiday",
+  "medical",
+  "personal",
+  "other",
+] as const;
+export type LeaveReason = (typeof LEAVE_REASONS)[number];
+
+export const LEAVE_REASON_LABELS: Record<LeaveReason, string> = {
+  holiday: "Holiday / Overseas",
+  medical: "Medical Leave",
+  personal: "Personal / Family Matters",
+  other: "Other",
+};
+
+/**
+ * The longest leave the form will accept, matching the CHECK constraint in
+ * 0034. Leave is self-declared with no approval, so this is the only thing
+ * between a mistyped year and six months of silence.
+ */
+export const MAX_LEAVE_DAYS = 180;
+
 export const REMINDER_TYPES = ["consultant_missing", "admin_digest"] as const;
 export type ReminderType = (typeof REMINDER_TYPES)[number];
 
@@ -92,6 +121,12 @@ export const AUDIT_ACTIONS = [
   "coaching_reopened",
   "coaching_missed",
   "coaching_acknowledged",
+  // Leave is self-declared with no approval, so the audit trail is the whole
+  // of the accountability. Backdated entries especially: the leave dates say
+  // when somebody was away, and only the audit row says when they told us.
+  "leave_created",
+  "leave_updated",
+  "leave_cancelled",
 ] as const;
 
 /** Plain-English descriptions for the audit trail screen. */
@@ -121,6 +156,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   coaching_reopened: "Reopened a coaching session",
   coaching_missed: "Marked coaching as missed",
   coaching_acknowledged: "Acknowledged a coaching session",
+  leave_created: "Scheduled leave",
+  leave_updated: "Changed leave dates",
+  leave_cancelled: "Cancelled leave",
 };
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { KeyRound, Bell } from "lucide-react";
-import { requireProfile, getNagStatus } from "@/lib/auth";
+import {
+  requireProfile,
+  getNagStatus,
+  getAwayToday,
+  isAwayFromNag,
+} from "@/lib/auth";
 import { BottomNav } from "@/components/app-shell/bottom-nav";
 import { SideNav } from "@/components/app-shell/side-nav";
 import { SubmissionNag } from "@/components/app-shell/submission-nag";
+import { AwayBanner } from "@/components/leave/away-banner";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
@@ -27,6 +33,17 @@ export default async function AppLayout({
   // a single boolean - a third of a second of transpacific latency to decide
   // whether to draw a banner.
   const submittedToday = (await getNagStatus()) === "submitted";
+
+  // Two different questions, from the same cached call.
+  //
+  //   awayFromNag  is about the day being CHASED, which between midnight and
+  //                6 AM is yesterday. It decides whether to nag at all.
+  //   awayToday    is about today, and draws the blue indicator.
+  //
+  // At 1 AM the morning after leave ends these disagree, and both are right:
+  // yesterday was an away day, today is not.
+  const awayFromNag = await isAwayFromNag();
+  const awayToday = await getAwayToday();
   const firstName = profile.full_name.split(" ")[0];
 
   // Only the count is needed up here, but the feed comes back with it in the
@@ -104,12 +121,20 @@ export default async function AppLayout({
 
         {/* pb-24 clears the fixed bottom navigation on mobile. */}
         <main className="flex-1 space-y-4 px-4 pb-24 pt-4 md:px-6 md:pb-10 md:pt-6">
-          <SubmissionNag submitted={submittedToday} firstName={firstName} />
+          {awayToday && <AwayBanner leave={awayToday} withLink />}
+          <SubmissionNag
+            submitted={submittedToday}
+            away={awayFromNag}
+            firstName={firstName}
+          />
           {children}
         </main>
       </div>
 
-      <BottomNav needsSubmission={!submittedToday} />
+      {/* No red dot on the Today tab either. A badge is a quieter nag, but it
+          is still a nag, and leaving it on would mean the app still looked
+          like it wanted something from somebody on holiday. */}
+      <BottomNav needsSubmission={!submittedToday && !awayFromNag} />
       <TeamCelebrations myId={profile.id} />
       <Toaster />
     </div>

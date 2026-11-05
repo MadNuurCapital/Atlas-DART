@@ -5,13 +5,30 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nagBusinessDate } from "@/lib/nag";
 import type { Profile } from "@/types/database";
-import type { SubmissionStatus } from "@/lib/constants";
+import type { LeaveReason, SubmissionStatus } from "@/lib/constants";
+
+/**
+ * Just enough of a leave period to draw the indicator.
+ *
+ * Three fields rather than the row: the shell renders a date and a label, and
+ * shipping the whole record would put somebody's medical note into the payload
+ * of every page they load.
+ */
+export type AwayState = {
+  starts_on: string;
+  ends_on: string;
+  reason: LeaveReason;
+};
 
 /** What the shell needs before it can draw anything. */
 type Bootstrap = {
   profile: Profile | null;
   /** The day being chased, or null if nothing is recorded for it yet. */
   nagStatus: SubmissionStatus | null;
+  /** Leave covering today, for the indicator. Null when not away. */
+  away: AwayState | null;
+  /** Whether the day being CHASED was an away day. Silences the nag. */
+  nagAway: boolean;
 };
 
 /**
@@ -48,7 +65,9 @@ const loadBootstrap = cache(async (): Promise<Bootstrap> => {
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
 
-  if (!userId) return { profile: null, nagStatus: null };
+  if (!userId) {
+    return { profile: null, nagStatus: null, away: null, nagAway: false };
+  }
 
   // One call for both answers the shell needs.
   //
@@ -70,12 +89,14 @@ const loadBootstrap = cache(async (): Promise<Bootstrap> => {
     // which is what a null profile already produces. Throwing would replace a
     // clean redirect with an error page on every route in the app.
     console.error("[auth] app_bootstrap failed: %s", error?.message);
-    return { profile: null, nagStatus: null };
+    return { profile: null, nagStatus: null, away: null, nagAway: false };
   }
 
   return {
     profile: payload.profile,
     nagStatus: payload.nag_status,
+    away: payload.away ?? null,
+    nagAway: payload.nag_away === true,
   };
 });
 
@@ -111,6 +132,29 @@ export async function requireAdmin(): Promise<Profile> {
   const profile = await requireProfile();
   if (profile.role !== "admin") redirect("/dashboard");
   return profile;
+}
+
+/**
+ * The leave period covering TODAY, or null.
+ *
+ * Drives the blue "Away Mode is on" indicator. Deliberately a different
+ * question from awayFromNag() below: at 2 AM the morning after leave ends,
+ * this is already null while the nag is still about yesterday, which was an
+ * away day. One date cannot answer both.
+ */
+export async function getAwayToday(): Promise<AwayState | null> {
+  return (await loadBootstrap()).away;
+}
+
+/**
+ * Whether the day currently being CHASED was an away day.
+ *
+ * This is the one that silences the banner and the Today badge. Between
+ * midnight and 6 AM the app chases yesterday, so somebody whose leave ended at
+ * midnight must not be nagged at 1 AM for the day they were away.
+ */
+export async function isAwayFromNag(): Promise<boolean> {
+  return (await loadBootstrap()).nagAway;
 }
 
 /** The profile if signed in, otherwise null. Does not redirect. */

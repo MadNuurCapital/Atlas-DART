@@ -25,6 +25,7 @@ import {
 import { CaseMixPanel } from "@/components/dashboard/case-mix-panel";
 import { MonthCasesTile } from "@/components/dashboard/month-cases-tile";
 import { MissedDaysNotice } from "@/components/dashboard/missed-days-notice";
+import { LeaveTile } from "@/components/dashboard/leave-tile";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -146,6 +147,17 @@ export default async function DashboardPage() {
         missed={data.missed}
         className="sm:col-span-2 lg:col-span-6"
       />
+
+      {/* Above the figures when Away Mode is on, so somebody opening the app
+          from a hotel sees that it has stopped asking before they see a
+          target they are not working towards this week. Below them otherwise,
+          because scheduling leave is not what the dashboard is for. */}
+      {data.leave?.active && (
+        <LeaveTile
+          leave={data.leave}
+          className="sm:col-span-2 lg:col-span-6"
+        />
+      )}
 
       <Card
         className={
@@ -273,8 +285,9 @@ export default async function DashboardPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Every calendar day counts, including weekends and public holidays.
-            You can still correct the last seven days.
+            Every calendar day counts, including weekends and public holidays,
+            except days you have declared as leave. You can still correct the
+            last seven days.
           </p>
           <Button asChild variant="ghost" size="sm">
             <Link href="/history">
@@ -296,6 +309,13 @@ export default async function DashboardPage() {
           pending={pendingRow}
           className="lg:col-span-2"
         />
+      )}
+
+      {/* The quiet version: one line offering the feature, or naming the trip
+          that is already booked. Only down here when Away Mode is NOT on -
+          when it is, the same tile is at the top of the page. */}
+      {!data.leave?.active && (
+        <LeaveTile leave={data.leave} className="sm:col-span-2 lg:col-span-6" />
       )}
     </div>
   );

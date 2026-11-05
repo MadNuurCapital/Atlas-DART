@@ -264,6 +264,15 @@ select * from public.missing_submissions(null);
 -- they submitted. A LEFT JOIN rather than a filter, so missing people are rows
 -- with nulls instead of silently absent.
 -- ---------------------------------------------------------------------------
+-- Dropped first so that re-applying the whole migration set is possible.
+-- 0035 adds three columns to this function's output, and Postgres refuses to
+-- CREATE OR REPLACE a function whose return type has changed - so a second
+-- pass over this file would fail with "cannot change return type of existing
+-- function" on a database that already has 0035. Nothing depends on this
+-- function: admin_overview calls it from a text-bodied SQL function, which
+-- Postgres does not dependency-track.
+drop function if exists public.team_daily(date);
+
 create or replace function public.team_daily(p_date date default null)
 returns table (
   user_id                 uuid,
@@ -326,6 +335,10 @@ $$;
 -- someone who has submitted every day reads 100% on the 12th rather than 40%.
 -- A finished month requires all of its days. A future month requires none.
 -- ---------------------------------------------------------------------------
+-- Dropped first, for the same reason as team_daily above: 0035 adds away_days
+-- to this function's output, and a changed return type cannot be replaced.
+drop function if exists public.monthly_compliance(int, int);
+
 create or replace function public.monthly_compliance(p_year int, p_month int)
 returns table (
   consultant_id  uuid,

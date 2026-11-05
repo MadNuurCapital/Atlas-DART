@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, RefreshCw, CircleCheck, CircleAlert } from "lucide-react";
+import {
+  Search,
+  RefreshCw,
+  CircleCheck,
+  CircleAlert,
+  Plane,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +17,7 @@ import {
   CAMPAIGN_STATUS_LABELS,
   formatCurrency,
 } from "@/lib/constants";
-import { formatSgTime } from "@/lib/sg-date";
+import { formatSgDate, formatSgTime } from "@/lib/sg-date";
 import type { TeamDailyRow } from "@/types/database";
 
 /**
@@ -22,15 +28,26 @@ import type { TeamDailyRow } from "@/types/database";
  */
 const REFRESH_QUIET_MS = 600;
 
-function OfficeDot({ inOffice }: { inOffice: boolean | null }) {
-  const cls =
-    inOffice === null
+function OfficeDot({
+  inOffice,
+  away,
+}: {
+  inOffice: boolean | null;
+  away?: boolean;
+}) {
+  // Away outranks "no submission". A grey dot reading "No submission" against
+  // somebody's name is a question; on a person who declared leave it is an
+  // answered one.
+  const cls = away
+    ? "bg-status-away"
+    : inOffice === null
       ? "bg-status-missing"
       : inOffice
         ? "bg-status-present"
         : "bg-status-absent";
-  const label =
-    inOffice === null
+  const label = away
+    ? "Away"
+    : inOffice === null
       ? "No submission"
       : inOffice
         ? "In the office"
@@ -47,6 +64,18 @@ function OfficeDot({ inOffice }: { inOffice: boolean | null }) {
 }
 
 function StatusBadge({ row }: { row: TeamDailyRow }) {
+  // Before the away case existed this fell straight through to the on_time
+  // badge, and on_time is null for anyone who has not submitted - so an
+  // advisor on declared leave would have been labelled "Late". Checked first,
+  // and ahead of missing and draft, for that reason.
+  if (row.status === "away") {
+    return (
+      <Badge variant="away">
+        <Plane className="size-3" aria-hidden="true" />
+        Away
+      </Badge>
+    );
+  }
   if (row.status === "missing") return <Badge variant="danger">Missing</Badge>;
   if (row.status === "draft") return <Badge variant="muted">Draft</Badge>;
   return (
@@ -154,7 +183,13 @@ export function TeamBoard({
     return {
       people: initialRows.length,
       submitted: submitted.length,
-      missing: initialRows.filter((r) => r.status !== "submitted").length,
+      // Away is NOT missing. Counting it here was the quiet version of the
+      // bug this feature fixes: the badge could read blue while the tile
+      // above it still told an admin four people had failed to submit.
+      missing: initialRows.filter(
+        (r) => r.status !== "submitted" && r.status !== "away",
+      ).length,
+      away: initialRows.filter((r) => r.away).length,
       late: submitted.filter((r) => r.on_time === false).length,
       inOffice: initialRows.filter((r) => r.in_office === true).length,
       dials: initialRows.reduce((s, r) => s + n(r.dials), 0),
@@ -175,6 +210,11 @@ export function TeamBoard({
           { label: "People", value: totals.people },
           { label: "Submitted", value: totals.submitted },
           { label: "Missing", value: totals.missing },
+          // Only when somebody is, so the board does not carry a permanent
+          // "Away 0" for a thing that is usually not happening.
+          ...(totals.away > 0
+            ? [{ label: "Away", value: totals.away }]
+            : []),
           { label: "Late", value: totals.late },
           { label: "In office", value: totals.inOffice },
           { label: "Team GR", value: formatCurrency(totals.gr) },
@@ -269,7 +309,11 @@ export function TeamBoard({
                 <tr
                   key={r.user_id}
                   className={`border-t border-border ${
-                    r.status === "missing" ? "bg-status-absent/5" : ""
+                    r.status === "missing"
+                      ? "bg-status-absent/5"
+                      : r.status === "away"
+                        ? "bg-status-away/5"
+                        : ""
                   }`}
                 >
                   <th scope="row" className="px-3 py-2.5 text-left font-normal">
@@ -296,7 +340,7 @@ export function TeamBoard({
                   <td className="px-2 py-2.5 text-right tabular-nums">
                     {r.active_gr === null ? "—" : formatCurrency(Number(r.active_gr))}
                   </td>
-                  <td className="px-2 py-2.5 text-center"><OfficeDot inOffice={r.in_office} /></td>
+                  <td className="px-2 py-2.5 text-center"><OfficeDot inOffice={r.in_office} away={r.away} /></td>
                   <td className="px-2 py-2.5 text-xs text-muted-foreground">
                     {r.first_submitted_at ? formatSgTime(r.first_submitted_at) : "—"}
                   </td>
@@ -318,18 +362,29 @@ export function TeamBoard({
         {rows.map((r) => (
           <Card
             key={r.user_id}
-            className={r.status === "missing" ? "border-status-absent/40" : ""}
+            className={
+              r.status === "missing"
+                ? "border-status-absent/40"
+                : r.status === "away"
+                  ? "border-status-away/40"
+                  : ""
+            }
           >
             <CardContent className="space-y-2 p-3.5">
               <div className="flex items-center gap-2">
-                <OfficeDot inOffice={r.in_office} />
+                <OfficeDot inOffice={r.in_office} away={r.away} />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {r.full_name}
                 </span>
                 <StatusBadge row={r} />
               </div>
 
-              {r.status === "missing" ? (
+              {r.status === "away" ? (
+                <p className="text-xs text-muted-foreground">
+                  Away{r.away_until ? ` until ${formatSgDate(r.away_until)}` : ""}.
+                  Not expected to submit.
+                </p>
+              ) : r.status === "missing" ? (
                 <p className="text-xs text-muted-foreground">
                   Nothing submitted for {businessDate}.
                 </p>

@@ -277,6 +277,7 @@ export async function gatherExportData(opts: {
       onTimeDays: Number(c.on_time_days),
       lateDays: Number(c.late_days),
       missingDays: Number(c.missing_days),
+    awayDays: Number(c.away_days),
       compliance: Number(c.compliance),
     })),
 

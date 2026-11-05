@@ -26,8 +26,14 @@ export function MissedDaysNotice({
   missed: MissedDays;
   className?: string;
 }) {
-  // Up to date, or brand new. Neither needs telling.
+  // Up to date, or brand new, or every missing day was declared leave - the
+  // count already has away days subtracted, so a week's holiday reads as 0.
   if (missed.missed === 0) return null;
+
+  // Away right now. A gap that predates the leave is still a real gap, but
+  // "Catch up" is not a reasonable thing to put in front of somebody on
+  // medical leave; it waits until they are back.
+  if (missed.away_now) return null;
 
   const days = missed.missed;
 

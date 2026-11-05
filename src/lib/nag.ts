@@ -53,8 +53,26 @@ export function isOverdue(now: Date = new Date()): boolean {
   return sgHour(now) < NAG_END_HOUR;
 }
 
-export function nagLevel(submitted: boolean, now: Date = new Date()): NagLevel {
+/**
+ * How hard to chase, given whether the day is submitted and whether the person
+ * declared leave over it.
+ *
+ * `away` is a separate argument rather than being folded into `submitted`,
+ * which would have been the one-line change. Away is not submitted - that
+ * conflation would have leaked into everything downstream that asks this
+ * function's caller "did they submit?", and it would have quietly told the
+ * Today tab that a holiday counted as a filed DART.
+ */
+export function nagLevel(
+  submitted: boolean,
+  now: Date = new Date(),
+  away = false,
+): NagLevel {
   if (submitted) return "none";
+
+  // Away Mode. Checked before the clock, because the clock is the only reason
+  // this function ever returns anything else.
+  if (away) return "none";
 
   const hour = sgHour(now);
 

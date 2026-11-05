@@ -76,7 +76,9 @@ const missed: MissedDays = {
   ever_submitted: true,
   last_submitted: "2026-06-10",
   missed: 0,
+  away_days: 0,
   submitted_today: false,
+  away_now: false,
 };
 
 const showMissed = (o: Partial<MissedDays>) =>

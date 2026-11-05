@@ -5,6 +5,7 @@ import type {
   TargetShortfall,
 } from "@/types/database";
 import type { CoachingWithNames } from "@/lib/coaching";
+import type { LeaveReason } from "@/lib/constants";
 
 /**
  * Cases written this month, with the same slice of earlier months to compare
@@ -29,8 +30,37 @@ export type MonthCases = {
 export type MissedDays = {
   ever_submitted: boolean;
   last_submitted: string | null;
+  /**
+   * Closed days since the last submission that the person was actually
+   * expected to submit on - away days are subtracted, not merely hidden. A
+   * week's holiday therefore leaves this at 0 rather than at 7.
+   */
   missed: number;
+  /**
+   * How many of the days in that gap were declared leave. Returned so the
+   * dashboard can tell "nothing to say" apart from "forgiven", rather than
+   * showing a suspiciously small number with no explanation.
+   */
+  away_days: number;
   submitted_today: boolean;
+  /** Away right now. Negative notices stay quiet during leave. */
+  away_now: boolean;
+};
+
+/**
+ * The active or next upcoming leave period, for the dashboard card.
+ *
+ * Null when there is neither. Past periods are not included: the card is a
+ * summary with a link, and history belongs on /leave.
+ */
+export type DashboardLeave = {
+  id: string;
+  starts_on: string;
+  ends_on: string;
+  reason: LeaveReason;
+  /** True when it covers today, which is the difference between "Away Mode
+   *  is on" and "Leave coming up". */
+  active: boolean;
 };
 
 /**
@@ -58,4 +88,5 @@ export type DashboardPayload = {
   coaching: CoachingWithNames[];
   cases_month: MonthCases;
   missed: MissedDays;
+  leave: DashboardLeave | null;
 };

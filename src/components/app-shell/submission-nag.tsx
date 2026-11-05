@@ -14,12 +14,19 @@ import { cn } from "@/lib/utils";
  */
 export function SubmissionNag({
   submitted,
+  away = false,
   firstName,
 }: {
   submitted: boolean;
+  /**
+   * True when the day being chased was covered by declared leave. The banner
+   * then renders nothing at all - there is no softer wording for "your DART is
+   * not updated" that is appropriate to send somebody on medical leave.
+   */
+  away?: boolean;
   firstName?: string;
 }) {
-  const level = nagLevel(submitted);
+  const level = nagLevel(submitted, new Date(), away);
   const copy = nagCopy(level, firstName);
 
   if (!copy) return null;

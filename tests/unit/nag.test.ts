@@ -148,3 +148,52 @@ describe("time remaining", () => {
     expect(timeLeftLabel(atSgHour(6))).toBe("Deadline passed");
   });
 });
+
+describe("Away Mode silences the in-app chase", () => {
+  /**
+   * The banner has no dismiss button by design - "submitting is the only way
+   * to make it go away, and that is the design". Which is exactly why leave
+   * has to be handled here rather than left to the person to put up with:
+   * there is no softer wording of "your DART is not updated" that belongs in
+   * front of somebody on medical leave.
+   */
+  it("says nothing at any hour of the chase", async () => {
+    for (const hour of [19, 20, 21, 22, 23, 0, 3, 6]) {
+      expect(nagLevel(false, atSgHour(hour), true), `hour ${hour}`).toBe(
+        "none",
+      );
+    }
+  });
+
+  it("still chases the same hours for anyone not away", () => {
+    expect(nagLevel(false, atSgHour(19), false)).toBe("firm");
+    expect(nagLevel(false, atSgHour(21), false)).toBe("urgent");
+    expect(nagLevel(false, atSgHour(23), false)).toBe("final");
+    expect(nagLevel(false, atSgHour(2), false)).toBe("overdue");
+  });
+
+  it("defaults to not away, so every existing caller is unchanged", () => {
+    // The parameter is optional on purpose: adding it must not have altered
+    // the behaviour of a single call that does not pass it.
+    expect(nagLevel(false, atSgHour(21))).toBe(nagLevel(false, atSgHour(21), false));
+    expect(nagLevel(false, atSgHour(21))).toBe("urgent");
+  });
+
+  it("is quiet for a submitted day whether away or not", () => {
+    expect(nagLevel(true, atSgHour(21), true)).toBe("none");
+    expect(nagLevel(true, atSgHour(21), false)).toBe("none");
+  });
+
+  /**
+   * Away is NOT submitted, and the two must not be conflated.
+   *
+   * Folding away into the `submitted` argument would have been the one-line
+   * version of this change. It would also have told everything downstream
+   * that a holiday counted as a filed DART - including the Today tab, the
+   * compliance figure and, eventually, somebody's scorecard.
+   */
+  it("keeps away and submitted as separate arguments", () => {
+    expect(nagCopy(nagLevel(false, atSgHour(21), true))).toBeNull();
+    expect(nagCopy(nagLevel(false, atSgHour(21), false))).not.toBeNull();
+  });
+});
